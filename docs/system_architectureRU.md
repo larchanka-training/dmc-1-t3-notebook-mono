@@ -24,6 +24,8 @@
 6. AI является частью notebook workflow и обновляет notebook-блоки напрямую.
 7. Frontend и backend — это отдельные приложения с явными контрактами между ними.
 8. Приватный доступ к notebook обеспечивается аутентификацией и backend-controlled access.
+9. Продукт поставляется как hosted web application с local-first поведением.
+10. Notebook-код выполняется в browser runtime, а backend остается слоем хранения, аутентификации и интеграций.
 
 ## 3. Зафиксированные решения для Version 1
 
@@ -39,8 +41,11 @@
 8. Конфликты синхронизации обрабатываются явно, без автоматического merge.
 9. Аутентифицированное browser-state использует backend-managed secure `HTTP-only` session cookie.
 10. Формат экспорта для Version 1 — переносимый notebook `JSON`.
+11. Аутентификация поддерживает и `Email + OTP`, и `Google OAuth`.
 
 ## 4. Состав системы
+
+Продукт открывается как web application в браузере и сохраняет local-first поведение во время работы с notebook.
 
 Продукт состоит из следующих основных частей:
 
@@ -54,6 +59,7 @@
 | `Database` | Долговременное server-side хранилище |
 | `LLM Integration` | AI-генерация и уточнение кода |
 | `Email Delivery Service` | Внешняя доставка OTP для аутентификации |
+| `Google OAuth Provider` | Внешний identity provider для browser sign-in |
 
 ## 5. Системный контекст
 
@@ -67,6 +73,7 @@ flowchart LR
     API --> DB["Database"]
     API --> LLM["LLM Integration"]
     API --> Email["Email Delivery Service"]
+    API --> OAuth["Google OAuth Provider"]
 ```
 
 ## 6. Ответственность компонентов
@@ -77,6 +84,7 @@ Frontend-приложение отвечает за:
 
 - UI списка notebook
 - UI редактора notebook
+- UI входа через email OTP и Google sign-in
 - создание, редактирование, удаление и перестановку блоков
 - рендеринг текста, кода и output-областей
 - отображение состояния синхронизации
@@ -126,6 +134,7 @@ Backend API отвечает за:
 
 - аутентификацию
 - выдачу и проверку OTP
+- обработку Google OAuth flow
 - создание аутентифицированной session
 - персистентность notebook
 - получение notebook
@@ -142,6 +151,7 @@ Backend API является server-side границей системы.
 
 - пользователей
 - записи, связанные с аутентификацией
+- связи с внешними OAuth-аккаунтами
 - notebook
 - block data
 - notebook metadata
@@ -173,6 +183,7 @@ Email delivery service отвечает за:
 | Аутентифицированная идентичность | `Backend API + Database` | Идентичность создается и проверяется server-side |
 | Жизненный цикл аутентифицированной session | `Backend API` | Backend выдает и проверяет secure session cookie; frontend использует authenticated session state |
 | Выдача и проверка OTP | `Backend API + Database` | Email-доставка внешняя, verification внутренняя |
+| Внешняя идентичность, привязанная через Google OAuth | `Backend API + Database` | Backend связывает identity провайдера с внутренней user identity |
 | Активная рабочая копия notebook | `Frontend Application + Local Storage` | Используется для редактирования и offline-работы |
 | Долговременное состояние notebook | `Backend API + Database` | Server-side persisted state после sync |
 | Порядок блоков | `Frontend Application` во время редактирования, `Backend API + Database` после sync | Передается через sync |
@@ -230,7 +241,7 @@ Email delivery service отвечает за:
 7. Пользователь подтверждает, редактирует или заменяет вставленный код.
 8. Получившийся блок остается обычным редактируемым notebook-блоком.
 
-### 8.6 Аутентификация пользователя
+### 8.6 Аутентификация пользователя через Email OTP
 
 1. Пользователь вводит email.
 2. Frontend запрашивает OTP через backend API.
@@ -240,7 +251,17 @@ Email delivery service отвечает за:
 6. Backend создает аутентифицированную session и устанавливает secure `HTTP-only` session cookie.
 7. Frontend продолжает работу в аутентифицированном состоянии.
 
-### 8.7 Экспорт notebook
+### 8.7 Вход через Google
+
+1. Пользователь выбирает вход через Google во frontend.
+2. Frontend запускает Google OAuth flow через backend API.
+3. Backend перенаправляет пользователя к Google OAuth provider.
+4. Google OAuth provider возвращает подтвержденный результат identity в backend callback.
+5. Backend создает или находит внутреннюю user identity и аутентифицированную session.
+6. Backend устанавливает secure `HTTP-only` session cookie.
+7. Frontend продолжает работу в аутентифицированном состоянии.
+
+### 8.8 Экспорт notebook
 
 1. Пользователь запрашивает экспорт.
 2. Frontend собирает notebook-контент в export format.

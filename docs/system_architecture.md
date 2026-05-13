@@ -24,6 +24,8 @@ The system is built under the following architectural constraints:
 6. AI is part of notebook editing flow and updates notebook blocks directly.
 7. Frontend and backend are separate applications with clear contracts between them.
 8. Private notebook access is enforced through authenticated backend-controlled access.
+9. The product is delivered as a hosted web application with local-first behavior.
+10. Notebook code executes in the browser runtime, while the backend remains the storage, auth, and integration plane.
 
 ## 3. Fixed Version 1 Decisions
 
@@ -39,8 +41,11 @@ The following architecture decisions are fixed for Version 1:
 8. Synchronization conflicts are handled explicitly without automatic merge.
 9. Authenticated browser state uses a backend-managed secure `HTTP-only` session cookie.
 10. The Version 1 export format is portable notebook `JSON`.
+11. Authentication supports both `Email + OTP` and `Google OAuth`.
 
 ## 4. System Composition
+
+The product is accessed as a web application in the browser and keeps local-first editing behavior during notebook work.
 
 The product consists of the following main parts:
 
@@ -54,6 +59,7 @@ The product consists of the following main parts:
 | `Database` | Durable server-side storage |
 | `LLM Integration` | AI code generation and refinement |
 | `Email Delivery Service` | External OTP delivery for authentication |
+| `Google OAuth Provider` | External identity provider for browser sign-in |
 
 ## 5. System Context
 
@@ -67,6 +73,7 @@ flowchart LR
     API --> DB["Database"]
     API --> LLM["LLM Integration"]
     API --> Email["Email Delivery Service"]
+    API --> OAuth["Google OAuth Provider"]
 ```
 
 ## 6. Component Responsibilities
@@ -77,6 +84,7 @@ The frontend application is responsible for:
 
 - notebook list UI
 - notebook editor UI
+- authentication entry UI for email OTP and Google sign-in
 - block creation, editing, deletion, and reordering
 - rendering text, code, and output areas
 - sync state presentation
@@ -126,6 +134,7 @@ The backend API is responsible for:
 
 - authentication
 - OTP issuance and verification
+- Google OAuth flow handling
 - authenticated session issuance
 - notebook persistence
 - notebook retrieval
@@ -142,6 +151,7 @@ The database stores durable server-side data:
 
 - users
 - authentication-related records
+- OAuth account links
 - notebooks
 - block data
 - notebook metadata
@@ -173,6 +183,7 @@ The email delivery service is responsible for:
 | Authenticated identity | `Backend API + Database` | Identity is created and verified server-side |
 | Authenticated session lifecycle | `Backend API` | Backend issues and validates the secure session cookie; frontend uses authenticated session state |
 | OTP issuance and verification | `Backend API + Database` | Email delivery is external, verification is internal |
+| Google OAuth-linked external identity | `Backend API + Database` | Backend maps the external provider identity to the internal user identity |
 | Active notebook working copy | `Frontend Application + Local Storage` | Used for editing and offline work |
 | Durable notebook state | `Backend API + Database` | Server-side persisted state after sync |
 | Block order | `Frontend Application` during editing, `Backend API + Database` after sync | Shared through sync |
@@ -230,7 +241,7 @@ The email delivery service is responsible for:
 7. The user confirms, edits, or replaces the inserted code.
 8. The resulting block remains a normal editable notebook block.
 
-### 8.6 Authenticate User
+### 8.6 Authenticate User with Email OTP
 
 1. The user enters an email address.
 2. The frontend requests an OTP through the backend API.
@@ -240,7 +251,17 @@ The email delivery service is responsible for:
 6. The backend creates the authenticated session and sets the secure `HTTP-only` session cookie.
 7. The frontend continues in authenticated state.
 
-### 8.7 Export Notebook
+### 8.7 Sign in with Google
+
+1. The user chooses Google sign-in in the frontend.
+2. The frontend starts the Google OAuth flow through the backend API.
+3. The backend redirects the user to the Google OAuth provider.
+4. The Google OAuth provider returns the verified identity result to the backend callback.
+5. The backend resolves or creates the internal user identity and authenticated session.
+6. The backend sets the secure `HTTP-only` session cookie.
+7. The frontend continues in authenticated state.
+
+### 8.8 Export Notebook
 
 1. The user requests export.
 2. The frontend gathers the notebook content in export format.

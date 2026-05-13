@@ -15,6 +15,7 @@ It describes:
 
 | Area | Technology | Role |
 |---|---|---|
+| Application delivery model | `Hosted web application with local-first behavior` | Browser-delivered product with client-side execution and server-side control, storage, and integrations |
 | Frontend language | `TypeScript` | Main frontend implementation language |
 | Frontend framework | `React` | Notebook user interface |
 | Frontend build tool | `Vite` | Frontend development server and build pipeline |
@@ -31,8 +32,9 @@ It describes:
 | Text block format | `Markdown` | Text block content format |
 | Code block format | `JavaScript` | Executable notebook code format |
 | API exchange format | `HTTP + JSON` | Frontend-backend communication |
-| Authentication method | `Email + OTP` | Version 1 sign-in flow |
+| Authentication method | `Email + OTP`, `Google OAuth` | Version 1 sign-in flows |
 | Auth client state | `Secure HTTP-only session cookie` | Browser auth state managed through backend session |
+| External identity provider | `Google OAuth` | Third-party browser sign-in |
 | AI access path | `Backend-mediated LLM access` | LLM requests pass through backend |
 
 ## 3. Frontend Stack
@@ -45,6 +47,7 @@ The confirmed frontend stack is:
 
 The frontend is responsible for:
 
+- browser-delivered application shell
 - notebook UI
 - block editing
 - execution UI
@@ -72,6 +75,7 @@ The backend is responsible for:
 
 - authentication
 - OTP issuance and verification
+- Google OAuth handling
 - notebook persistence
 - sync endpoints
 - access control
@@ -97,6 +101,7 @@ The confirmed execution technology choices are:
 - executable notebook language: `JavaScript`
 - execution location for Version 1: `client-side`
 - execution control location: `frontend-side execution orchestrator`
+- application delivery surface: browser-hosted web application
 
 The execution runtime remains a distinct architectural part even though it is client-side.
 
@@ -104,9 +109,10 @@ The execution runtime remains a distinct architectural part even though it is cl
 
 The confirmed authentication and security choices are:
 
-- sign-in method: `Email + OTP`
-- authenticated browser state: backend-managed secure `HTTP-only` session cookie
+- sign-in methods: `Email + OTP`, `Google OAuth`
+- authenticated browser state after email or Google sign-in: backend-managed secure `HTTP-only` session cookie
 - OTP delivery: external email delivery service
+- external identity provider: `Google OAuth`
 - access control enforcement: backend-side
 - AI provider credentials: backend-side
 - notebook code trust level: untrusted

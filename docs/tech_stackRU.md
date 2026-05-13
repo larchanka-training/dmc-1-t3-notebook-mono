@@ -15,6 +15,7 @@
 
 | Область | Технология | Роль |
 |---|---|---|
+| Модель поставки приложения | `Hosted web application with local-first behavior` | Продукт работает в браузере, выполняет код client-side и использует server-side слой для управления, хранения и интеграций |
 | Язык frontend | `TypeScript` | Основной язык реализации frontend |
 | Framework frontend | `React` | Пользовательский интерфейс notebook |
 | Build tool frontend | `Vite` | Development server и build pipeline frontend |
@@ -31,8 +32,9 @@
 | Формат text block | `Markdown` | Формат контента текстовых блоков |
 | Формат code block | `JavaScript` | Формат исполняемого notebook-кода |
 | Формат API-обмена | `HTTP + JSON` | Коммуникация между frontend и backend |
-| Метод аутентификации | `Email + OTP` | Sign-in flow для Version 1 |
+| Метод аутентификации | `Email + OTP`, `Google OAuth` | Sign-in flows для Version 1 |
 | Browser-side auth state | `Secure HTTP-only session cookie` | Браузерное auth-state управляется через backend session |
+| Внешний identity provider | `Google OAuth` | Сторонний browser sign-in |
 | Путь доступа к AI | `Backend-mediated LLM access` | LLM-запросы проходят через backend |
 
 ## 3. Frontend Stack
@@ -45,6 +47,7 @@
 
 Frontend отвечает за:
 
+- browser-delivered application shell
 - notebook UI
 - редактирование блоков
 - execution UI
@@ -72,6 +75,7 @@ Backend отвечает за:
 
 - аутентификацию
 - выдачу и проверку OTP
+- обработку Google OAuth
 - персистентность notebook
 - sync endpoints
 - access control
@@ -97,6 +101,7 @@ Backend отвечает за:
 - исполняемый notebook-язык: `JavaScript`
 - location выполнения для Version 1: `client-side`
 - location execution control: `frontend-side execution orchestrator`
+- delivery surface приложения: browser-hosted web application
 
 Execution runtime остается отдельной архитектурной частью, даже при client-side размещении.
 
@@ -104,9 +109,10 @@ Execution runtime остается отдельной архитектурной
 
 Подтвержденные решения по аутентификации и безопасности:
 
-- способ входа: `Email + OTP`
-- аутентифицированное browser-state: backend-managed secure `HTTP-only` session cookie
+- способы входа: `Email + OTP`, `Google OAuth`
+- аутентифицированное browser-state после входа через email или Google: backend-managed secure `HTTP-only` session cookie
 - доставка OTP: внешний email delivery service
+- внешний identity provider: `Google OAuth`
 - применение access control: backend-side
 - credentials AI-провайдера: backend-side
 - уровень доверия к notebook-коду: untrusted
