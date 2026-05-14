@@ -13,6 +13,19 @@ The goal is not to rewrite the author's code in your own style. The goal is to d
 
 Approve code that improves the codebase and satisfies requirements, even if it is not exactly how you would have written it.
 
+## Instruction Priority
+
+Project-specific instructions have higher priority than this skill.
+
+When working in a repository, always check and follow:
+
+1. `AGENTS.md`
+2. Canonical project documentation
+3. Existing codebase conventions
+4. This skill
+
+If this skill conflicts with `AGENTS.md`, canonical documentation, or established repository patterns, follow the project-specific source instead.
+
 ## When to Use
 
 Use this skill when:

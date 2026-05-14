@@ -11,6 +11,19 @@ Analyze whether implemented work is actually ready. This skill is not for writin
 
 The output should identify what is verified, what is unverified, what is risky, and what must be fixed before the work can be considered complete.
 
+## Instruction Priority
+
+Project-specific instructions have higher priority than this skill.
+
+When working in a repository, always check and follow:
+
+1. `AGENTS.md`
+2. Canonical project documentation
+3. Existing codebase conventions
+4. This skill
+
+If this skill conflicts with `AGENTS.md`, canonical documentation, or established repository patterns, follow the project-specific source instead.
+
 ## When to Use
 
 Use this skill when:

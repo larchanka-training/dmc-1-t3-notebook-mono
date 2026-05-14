@@ -11,6 +11,19 @@ Build reliable, maintainable backend code using the project's existing Python st
 
 The goal is stable behavior, clear boundaries, explicit validation, predictable APIs, and testable business logic.
 
+## Instruction Priority
+
+Project-specific instructions have higher priority than this skill.
+
+When working in a repository, always check and follow:
+
+1. `AGENTS.md`
+2. Canonical project documentation
+3. Existing codebase conventions
+4. This skill
+
+If this skill conflicts with `AGENTS.md`, canonical documentation, or established repository patterns, follow the project-specific source instead.
+
 ## When to Use
 
 Use this skill when:
