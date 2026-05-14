@@ -1,0 +1,117 @@
+name: 🐛 Bug Report
+description: Сообщить об ошибке в продукте
+title: "[Bug]: "
+labels: ["bug", "triage"]
+projects: ["larchanka-training/4"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за репорт! Заполни поля ниже — это ускорит починку.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Краткое описание
+      description: Что произошло, в одном предложении.
+      placeholder: При клике на «Сохранить» приложение падает
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      description: Минимальный сценарий, чтобы повторить баг.
+      value: |
+        1. Открыть...
+        2. Нажать...
+        3. Увидеть ошибку
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактическое поведение
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        Условия, при которых баг считается исправленным.
+        Можно чек-листом или в формате Given / When / Then.
+      value: |
+        - [ ] Баг не воспроизводится по шагам выше
+        - [ ] Добавлен автотест, покрывающий сценарий
+        - [ ] Нет регрессий в смежной функциональности
+        - [ ] Проверено в окружении из поля «Версия / окружение»
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        **Виды тестов:** отметь только те, без которых этот баг нельзя считать закрытым. Расшифровка — в `docs/qa-plan.md`, подзаголовок **«Виды тестов для issue»**.
+
+  - type: checkboxes
+    id: test_types
+    attributes:
+      label: Виды тестов (обязательные для закрытия)
+      description: Не отмечай лишнее — только то, что реально нужно по области бага.
+      options:
+        - label: Юнит-тесты на затронутую логику
+        - label: Интеграционные API (эндпоинты, БД, права доступа)
+        - label: Интеграционные UI (компоненты, роутер, стейт)
+        - label: E2E по критическому пользовательскому сценарию
+        - label: Регрессия в затронутой области / смежных сценариях V1
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - S1 — блокер
+        - S2 — критичный
+        - S3 — обычный
+        - S4 — мелкий
+      default: 2
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия / окружение
+      placeholder: "app v1.4.2, macOS 15, Chrome 140"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи / скриншоты
+      description: Вставь стектрейсы, логи консоли или приложи скриншоты.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Чек-лист
+      options:
+        - label: Я поискал дубликаты в Issues
+          required: true
+        - label: Я воспроизвёл баг на последней версии
+          required: true
