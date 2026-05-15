@@ -1,34 +1,37 @@
 
 # Creating Dockerfile
 
-## Prepare zero-project
+## Prepare dockerfiles
 
-Initial AI prompt:
+As discovered I incorrectly cloned `mono-repo` that is why `api` and `ui` folders were empty.
+Thus, following this wrong way I tried to create "zero-point-projects" for both `api` and `ui`.
+Now I cloned mono-repo correctly and now `api` and `ui` folders are not empty.
+So, need to re-do this task.
+
+AI prompt:
 ```
-role: Software Architect, Python expert and React developer
+role: Software Architect, DevOps engineer, Python and React developer
 task:
-  1. read docs/tech_stack.md
-
-  2. prepare simple backend project inside `api` folder. App parameters should be specified in `api/.env` file. Expose minimal API from backend project, ex: it should handle `/v1/api/version` request with responding app version and "hello world" message. Please note: it should use Python 3.12
-
-  3. prepare simple frontend project in 'ui' folder. It should call `/v1/api/version` API on backend and show version and message on a screen. Address where backend is running it should take from parameter in `ui/.env. file.
-
-  4. Check `docker-compose.yaml` file to see what ports should be used for `api` and for `ui` apps. create appropriate  dockerfile if any is missing
-
-  5. both `api` and `ui` projects should map project folder on host PC into a docker container, so user can change code and it should affect running container to see the result 
-
-  6. ensure `bash` installed into docker containers to ensure setup is compatible with `start-services.sh` script
-
-  7. Modify `proxy/nginx.conf` config to change ports from 80 and 443 to 8080 and 8443.
+  1. check `docker-compose.yaml` file, create missing docker files
+  2. ensure `bash` installed for api and ui docker images
+  3. ensure `api` and `ui` projects use `.env` file to read parameters from
+  4. ensure `api` and `ui` projects use bindMound 
+  5. ensure to create default configuration for `alembic` in `api` project
+  6. ensure to check `api` project to there will not be `CORS policy` error when making API calls
+  7. change ports for `proxy` project from 80 and 443 to 8080 and 8443
+constrains:
+  - use python 3.12
+  - do not touch `.env.example` file - that is only abstract example.
+  - if only possible keep `start-services.sh` script as-is
+  - minimize changes to `docker-compose.yaml` file, if it use `sh` - keep it
+  - do not change `fastapi` CLI with `unicorn`
+  - check if `fastapi` CLI is available and add required dependencies if required
+  - ensure `npm` also install optional dependencies 
 ```
 
-**Hint by VsCode**: An environment file is configured but terminal environment injection is disabled. Enable "python.terminal.useEnvFile" to use environment variables from .env files in terminals.
 
-It should prepare 2 simple projects - `api` and `ui` and update basic 2 dockerfiles which I prepared before.
 
-Then need to start `docker compose up -d --build --force-recreate` to rebuild all services.
-
-Then you can run `./start-services.sh` in a root of mono-repo.
+## When success
 
 If all was ok, then there will be following services available:
 - http://localhost:5050 - pgAgmin
@@ -151,7 +154,7 @@ Then can run `./start-services.sh` in a root of mono-repo.
 As discovered there is ref to `alembic upgrade head` in `docker-compose.yaml` file.
 API container needs a alembic lib with some basic config to be able to start with such compose configuration.
 
-Asked AI to add dependency and prepare minimal/default config alembic.
+Asked AI to add dependency and prepare minimal/default config `alembic`.
 
 Now it starts... but still some problems - there is API call failure.
 
@@ -165,13 +168,54 @@ Now it starts... but still some problems - there is API call failure.
 Asked AI to help - it modified 
 
 
+## Error response from daemon: error while creating mount source path '/run/desktop/mnt/host/w/larchanka/dmc-1-t3-notebook-mono/api': mkdir /run/desktop/mnt/host/w: file exists
+
+It tells that when moundBind is used then running project on drive W: may make it fail.
+It recommends to move it drive C:, restart Docker Desktop, run `wsl --shutdown`.
+Then rebuild compose - `docker compose up -d --build`
+
+Ok. Moved to `C:\sbx\edu\dmc-1-t3-notebook-mono`... seems now it works.
+
+
+## `api` container fail to start.
+
+There was error in log - kind of "missing fastapi command, please use fastapi[standard] in requirements.txt".
+Fixed.
+
+```
+To use the fastapi command, please install "fastapi[standard]":
+api-1  | Traceback (most recent call last):
+api-1  |   File "/usr/local/bin/fastapi", line 8, in <module>
+api-1  |     sys.exit(main())
+api-1  |              ^^^^^^
+api-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/cli.py", line 12, in main
+api-1  |     raise RuntimeError(message)  # noqa: B904
+api-1  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+api-1  | RuntimeError: To use the fastapi command, please install "fastapi[standard]":
+```
+
+
+## Error: frontend container fail to start
+```
+Error: Cannot find module @rollup/rollup-linux-x64-musl. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
+frontend-1  |     at requireWithFriendlyError (/home/app/node_modules/rollup/dist/native.js:115:9)
+```
+
+AI tells that failure was because of missing optional updated during npm install.
+Suggested to fix `dockerfile` and `docker-compose.yaml`:
+```
+RUN npm ci --include=optional
+sh -c "cd /home/app && npm ci --include=optional && npm run dev"
+```
+
+
 
 # How-To
 
 ## how to delete all which was created from docker-compose.yaml ?
 
-standard delete: `docker compose down`
-delete with data volumed: `docker compose down -v`
-delete with local image: `docker compose down --rmi local`
-maximum cleanup: `docker compose down -v --rmi all`
+- standard delete: `docker compose down`
+- delete with data volumed: `docker compose down -v`
+- delete with local image: `docker compose down --rmi local`
+- maximum cleanup: `docker compose down -v --rmi all`
 
