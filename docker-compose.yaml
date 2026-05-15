@@ -7,6 +7,8 @@ services:
       - "3000:5173"
     volumes:
       - ./ui:/home/app
+    env_file:
+      - ./ui/.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -22,6 +24,8 @@ services:
       - "8000:8000"
     volumes:
       - ./api:/app
+    env_file:
+      - ./api/.env
     environment:
       DATABASE_URL: postgresql://admin:admin123@postgres:5432/wiki
       OAUTH_NAME_APPLICATION_ID: 694be7c773e78
@@ -34,8 +38,7 @@ services:
     stdin_open: true
     command: >
       sh -c "pip install --no-cache-dir --upgrade -r requirements.txt &&
-             alembic upgrade head &&
-             fastapi dev app/main.py --host 0.0.0.0 --port 8000"
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   postgres:
     image: postgres:16
@@ -81,8 +84,8 @@ services:
       context: ./proxy
       dockerfile: Dockerfile
     ports:
-      - 80:80
-      - 443:443
+      - 8080:8080
+      - 8443:8443
     restart: always
 
 volumes:
