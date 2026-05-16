@@ -36,7 +36,7 @@ Before any non-trivial implementation task, read:
 4. [docs/system_architecture.md](./docs/system_architecture.md)
 5. [docs/tech_stack.md](./docs/tech_stack.md)
 6. Shared project quality and acceptance context when relevant:
-   - [docs/qa-plan.md](./docs/qa-plan.md)
+   - [docs/qa_plan.md](./docs/qa_plan.md)
    - issue templates and task templates in `.github/`
 7. Repository-specific architecture as needed:
    - [ui/docs/ui_architecture.md](./ui/docs/ui_architecture.md)
@@ -102,6 +102,6 @@ They must not override:
 - [docs/project.md](./docs/project.md)
 - [docs/system_architecture.md](./docs/system_architecture.md)
 - [docs/tech_stack.md](./docs/tech_stack.md)
-- [docs/qa-plan.md](./docs/qa-plan.md)
+- [docs/qa_plan.md](./docs/qa_plan.md)
 - [ui/docs/ui_architecture.md](./ui/docs/ui_architecture.md)
 - [api/docs/api_architecture.md](./api/docs/api_architecture.md)
