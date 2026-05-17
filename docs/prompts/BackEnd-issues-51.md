@@ -246,3 +246,143 @@ VERSION="1.0.0"
 ENVIRONMENT="development"
 LOG_LEVEL="DEBUG"
 ```
+
+
+
+
+
+## 5. Implementation Delta — Changes Beyond Base Specification
+
+This section documents all deviations and additions made during actual implementation compared to sections 1–4 above. Follow these notes to fully reproduce the resulting codebase.
+
+---
+
+### 5.1 Configuration Extends Base Spec
+
+`app/core/config.py` retains the pre-existing CORS and database settings that were already in the project before this task. The final `Settings` class includes:
+
+- `DATABASE_URL` — PostgreSQL connection string (was `database_url` in the original template)
+- `BACKEND_CORS_ORIGINS` — list of allowed origins with a `field_validator` for comma-separated string parsing (was `backend_cors_origins`)
+- All field names were uppercased to match Pydantic Settings convention (`app_name` → `PROJECT_NAME`, `app_env` → `ENVIRONMENT`, `api_prefix` → `API_V1_STR`)
+
+Additional imports compared to the base spec: `Annotated`, `Any` from `typing`; `Field`, `field_validator` from `pydantic`; `NoDecode` from `pydantic_settings`.
+
+---
+
+### 5.2 `app/main.py` — CORS Middleware and Request Logging
+
+The base spec does not include CORS middleware or request-level logging. The actual implementation adds:
+
+1. **CORSMiddleware** — configured from `settings.BACKEND_CORS_ORIGINS` (carried over from the existing project).
+2. **`request_logging_middleware`** — an `@app.middleware("http")` that logs every request with method, path, status code, and duration in milliseconds. Unhandled exceptions are logged with full traceback before re-raising.
+
+Additional imports: `time`, `Request`, `Response` from `fastapi`, `CORSMiddleware` from `fastapi.middleware.cors`.
+
+---
+
+### 5.3 Feature-Driven Directory Structure
+
+Per `api/docs/api_architecture.md`, the canonical backend layout uses `features/` instead of only `api/v1/routes/`. The following directories were created as empty packages (`__init__.py` only):
+
+```text
+app/
+  features/
+    __init__.py
+    auth/__init__.py
+    notebooks/__init__.py
+    ai/__init__.py
+    system/
+      __init__.py
+      router.py          ← canonical health endpoint at /system/health
+  db/__init__.py
+  integrations/__init__.py
+```
+
+---
+
+### 5.4 Dual Health Endpoint Registration
+
+The health endpoint is registered at two paths:
+
+| Path | Source | Reason |
+|---|---|---|
+| `GET /api/v1/health` | `app/api/v1/routes/health.py` | Matches this spec (section 2) and backward compatibility |
+| `GET /api/v1/system/health` | `app/features/system/router.py` | Canonical route per `api/docs/api_architecture.md` section 8.4 |
+
+`app/api/v1/router.py` imports both:
+
+```python
+from app.api.v1.routes import health as legacy_health
+from app.features.system.router import router as system_router
+
+api_v1_router = APIRouter()
+api_v1_router.include_router(system_router)
+api_v1_router.include_router(legacy_health.router)
+```
+
+---
+
+### 5.5 `.env.example` Extended
+
+The actual `.env.example` includes additional variables beyond section 4:
+
+```env
+PROJECT_NAME="Backend API"
+VERSION="1.0.0"
+ENVIRONMENT="development"
+LOG_LEVEL="DEBUG"
+API_V1_STR="/api/v1"
+DATABASE_URL="postgresql+psycopg://admin:admin123@postgres:5432/wiki"
+BACKEND_CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,https://localhost:8443"
+```
+
+---
+
+### 5.6 Test Suite Additions
+
+`tests/test_health.py` contains three tests instead of one:
+
+1. `test_health_check_endpoint_returns_valid_payload` — tests `GET /api/v1/health` (matches base spec).
+2. `test_system_health_endpoint_returns_valid_payload` — tests `GET /api/v1/system/health` (canonical architecture route).
+3. `test_health_check_includes_cors_headers_for_allowed_origin` — verifies CORS `access-control-allow-origin` header for an allowed origin.
+
+All tests use the `client` fixture from `conftest.py`.
+
+---
+
+### 5.7 `start-services.sh` Fixes
+
+Three minimal changes were applied to the project-root `start-services.sh`:
+
+1. `docker-compose` → `docker compose` (Docker Compose v2 CLI).
+2. `name=api-1` → `name=api` and `name=frontend-1` → `name=frontend` (container name filter now matches the actual compose-generated names which include the project directory prefix).
+3. Added `[ -z "$VAR" ]` guard before `docker exec` and quoted `"$API_CONTAINER"` / `"$FRONTEND_CONTAINER"` to prevent "No such container" errors when the variable is empty.
+
+---
+
+### 5.8 Files Created (Not in Base Spec)
+
+| File | Purpose |
+|---|---|
+| `app/core/__init__.py` | Package marker (was missing) |
+| `app/features/__init__.py` | Features package root |
+| `app/features/auth/__init__.py` | Placeholder for auth feature |
+| `app/features/notebooks/__init__.py` | Placeholder for notebooks feature |
+| `app/features/ai/__init__.py` | Placeholder for AI feature |
+| `app/features/system/__init__.py` | Placeholder for system feature |
+| `app/features/system/router.py` | Canonical `/system/health` endpoint |
+| `app/db/__init__.py` | Placeholder for shared DB infrastructure |
+| `app/integrations/__init__.py` | Placeholder for external integrations |
+| `tests/__init__.py` | Package marker for test discovery |
+
+---
+
+### 5.9 Files Preserved From Original Template
+
+The following files existed before this task and were kept unchanged:
+
+- `app/api/v1/endpoints/__init__.py`
+- `app/api/v1/endpoints/health.py` (original simple healthcheck, superseded by `routes/health.py`)
+- `alembic.ini`, `alembic/env.py`
+- `pyproject.toml`, `requirements.txt`, `requirements-dev.txt`
+- `Dockerfile`
