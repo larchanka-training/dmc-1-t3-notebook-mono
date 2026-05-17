@@ -246,6 +246,7 @@ VERSION="1.0.0"
 ENVIRONMENT="development"
 LOG_LEVEL="DEBUG"
 <<<<<<< HEAD
+<<<<<<< HEAD
 ```
 
 
@@ -390,3 +391,6 @@ The following files existed before this task and were kept unchanged:
 =======
 ```
 >>>>>>> 01126b9 (T3/BTF - Engineer - Backend Foundation mono-v2)
+=======
+```
+>>>>>>> 98d85e5 (T3/BTF - Engineer - Backend Foundation mono-v2)
