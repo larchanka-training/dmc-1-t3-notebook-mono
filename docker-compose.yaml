@@ -7,6 +7,7 @@ services:
       - "3000:5173"
     volumes:
       - ./ui:/home/app
+      - /home/app/node_modules
     env_file:
       - ./ui/.env
     depends_on:

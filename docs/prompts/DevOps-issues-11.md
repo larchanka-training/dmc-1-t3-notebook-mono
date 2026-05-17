@@ -27,7 +27,22 @@ constrains:
   - do not change `fastapi` CLI with `unicorn`
   - check if `fastapi` CLI is available and add required dependencies if required
   - ensure `npm` also install optional dependencies 
+  - ensure to fix moundBind for `ui` container to avoid overriding `node_modules` folder inside container with `node_modules` in `ui` app on host
 ```
+
+
+### Fix 1
+
+This problem was discovered on 1st pull request for code change:
+`node_modules` folder on host overrides the same folder in container, as result - there might be conflicts and failures.
+
+So, prompt to fix it:
+```
+role: DevOps engineer
+task: need to fix moundBind for `ui` container to avoid overriding `node_modules` folder inside container with `node_modules` in `ui` app on host
+```
+
+This fix-prompt already included into `constraints` section in main prompt.
 
 
 
@@ -149,7 +164,7 @@ Then run `docker compose up -d --build --force-recreate` to force rebuild all.
 Then can run `./start-services.sh` in a root of mono-repo.
 
 
-## API container start and immediately stopped
+### API container start and immediately stopped
 
 As discovered there is ref to `alembic upgrade head` in `docker-compose.yaml` file.
 API container needs a alembic lib with some basic config to be able to start with such compose configuration.
@@ -159,7 +174,7 @@ Asked AI to add dependency and prepare minimal/default config `alembic`.
 Now it starts... but still some problems - there is API call failure.
 
 
-## API call failure: {url} has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+### API call failure: {url} has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 
 ```
 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
@@ -168,7 +183,7 @@ Now it starts... but still some problems - there is API call failure.
 Asked AI to help - it modified 
 
 
-## Error response from daemon: error while creating mount source path '/run/desktop/mnt/host/w/larchanka/dmc-1-t3-notebook-mono/api': mkdir /run/desktop/mnt/host/w: file exists
+### Error response from daemon: error while creating mount source path '/run/desktop/mnt/host/w/larchanka/dmc-1-t3-notebook-mono/api': mkdir /run/desktop/mnt/host/w: file exists
 
 It tells that when moundBind is used then running project on drive W: may make it fail.
 It recommends to move it drive C:, restart Docker Desktop, run `wsl --shutdown`.
@@ -177,7 +192,7 @@ Then rebuild compose - `docker compose up -d --build`
 Ok. Moved to `C:\sbx\edu\dmc-1-t3-notebook-mono`... seems now it works.
 
 
-## `api` container fail to start.
+### `api` container fail to start.
 
 There was error in log - kind of "missing fastapi command, please use fastapi[standard] in requirements.txt".
 Fixed.
@@ -195,7 +210,7 @@ api-1  | RuntimeError: To use the fastapi command, please install "fastapi[stand
 ```
 
 
-## Error: frontend container fail to start
+### Error: frontend container fail to start
 ```
 Error: Cannot find module @rollup/rollup-linux-x64-musl. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
 frontend-1  |     at requireWithFriendlyError (/home/app/node_modules/rollup/dist/native.js:115:9)
@@ -208,9 +223,45 @@ RUN npm ci --include=optional
 sh -c "cd /home/app && npm ci --include=optional && npm run dev"
 ```
 
+### Error: failed to solve: invalid file request node_modules/.bin/acorn
+```
+ - Image dmc-1-t3-notebook-mono-api      Building                                                       11.1s
+target frontend: failed to solve: invalid file request node_modules/.bin/acorn
+```
+
+Seems local build files appears in docker image.
+As discovered - there is no `.dockerignore` file which can filter that out.
+So, need to create `.dockerignore` file with minimal content like this:
+```
+node_modules
+dist
+.git
+```
+And then do:
+```
+docker compose build --no-cache frontend
+docker compose up -d
+```
+
+
+### Error: dopcker container for ui fail to start: errors in `node_modules`
+
+As discovered docker *bindMount* feature mounting whole application folder with `node_modules` inside.
+So, `node_modules` on host overrides `node_modules` inside container. 
+That cause problems in runtime.
+
+AI tells - there is special technique for this - need to explicitly mount `/home/app/node_modules` inside a container.
+So, need a small change in `docker-compose.yaml` file.
+
+
 
 
 # How-To
+
+## Initial docker build
+
+`docker-compose up -d`
+
 
 ## how to delete all which was created from docker-compose.yaml ?
 
