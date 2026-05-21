@@ -245,13 +245,6 @@ PROJECT_NAME="Enterprise Backend API"
 VERSION="1.0.0"
 ENVIRONMENT="development"
 LOG_LEVEL="DEBUG"
-<<<<<<< HEAD
-<<<<<<< HEAD
-```
-
-
-
-
 
 ## 5. Implementation Delta — Changes Beyond Base Specification
 
@@ -388,9 +381,3 @@ The following files existed before this task and were kept unchanged:
 - `alembic.ini`, `alembic/env.py`
 - `pyproject.toml`, `requirements.txt`, `requirements-dev.txt`
 - `Dockerfile`
-=======
-```
->>>>>>> 01126b9 (T3/BTF - Engineer - Backend Foundation mono-v2)
-=======
-```
->>>>>>> 98d85e5 (T3/BTF - Engineer - Backend Foundation mono-v2)
