@@ -3,7 +3,10 @@
 Этот репозиторий содержит все основные сервисы проекта (Frontend, Backend, База данных, pgAdmin, reverse-proxy и др.) и предоставляет удобный способ локального запуска через Docker.
 
 Для работы необходим установленный **Docker** (или Docker Desktop).
+## AI Agent Configuration
 
+- [AGENTS.md](./AGENTS.md) — bootstrap entry point and execution policy for AI agents (required reading order, source-of-truth precedence, mandatory rules).
+- [CLAUDE.md](./CLAUDE.md) — Claude-specific agent entry point; references `AGENTS.md` for all execution context.
 ---
 
 # Зачем это всё нужно
