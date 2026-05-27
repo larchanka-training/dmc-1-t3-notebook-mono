@@ -7,9 +7,7 @@ description: Builds and modifies backend application code, with Python as the de
 
 ## Overview
 
-Build reliable, maintainable backend code using the project's existing Python stack. Do not assume the framework until the repository has been inspected. The backend may use FastAPI, Django, Flask, Starlette, Celery, SQLAlchemy, Django ORM, Pydantic, or another Python ecosystem.
-
-The goal is stable behavior, clear boundaries, explicit validation, predictable APIs, and testable business logic.
+Build reliable, maintainable backend code using the project's Python stack. The goal is stable behavior, clear boundaries, explicit validation, predictable APIs, and testable business logic.
 
 ## Instruction Priority
 
@@ -38,22 +36,15 @@ Use this skill when:
 - Writing backend tests
 - Fixing backend bugs
 
-## First Step: Discover the Backend Stack
+## Project Stack (Do Not Deviate)
 
-Before writing code, inspect the project for:
-
-- Framework: FastAPI, Django, Flask, Starlette, or other
-- Runtime style: sync, async, or mixed
-- Data validation: Pydantic, serializers, dataclasses, custom validators
-- Database access: SQLAlchemy, Django ORM, raw SQL, repository layer
-- Migration system: Alembic, Django migrations, custom migrations
-- Dependency injection or service wiring
-- Test framework: pytest, unittest, Django test runner, factory libraries
-- API style: REST, GraphQL, RPC, internal service calls
-- Existing error response format
-- Existing logging and observability patterns
-
-Follow existing project conventions unless there is a clear reason not to.
+- **Framework**: FastAPI (async handlers, `Depends()` injection, lifespan context manager)
+- **Validation**: Pydantic v2 (`BaseModel`, `field_validator`, `model_validator`, `BaseSettings` with `SettingsConfigDict`)
+- **Database**: SQLAlchemy 2.0 ORM (async engine, `mapped_column`, `select()` style — NOT legacy `session.query()`)
+- **Migrations**: Alembic (auto-generate from models, online + offline modes)
+- **Driver**: psycopg (binary) for PostgreSQL 16
+- **Testing**: pytest + FastAPI `TestClient` (sync), fixture-based setup
+- **Logging**: Python stdlib `logging` with structured format
 
 ## Core Principles
 
@@ -157,27 +148,37 @@ Check for:
 
 Authentication proves who the user is. Authorization proves what they may do. Implement both where required.
 
-## Python Code Quality
+## Project File Structure
 
-Prefer:
+New backend features follow this structure:
 
-- Clear function names
-- Typed function signatures where the project uses typing
-- Small functions with focused responsibilities
-- Explicit exceptions for expected failure modes
-- Dependency injection or explicit parameters over hidden globals
-- Pure functions for business rules where possible
-- Structured logging instead of print statements
+```
+api/app/features/<feature_name>/
+├── __init__.py
+├── router.py        # APIRouter with prefix and tags
+├── schemas.py       # Pydantic request/response models
+├── service.py       # Business logic (no HTTP concerns)
+├── repository.py    # Database queries (SQLAlchemy)
+├── models.py        # SQLAlchemy ORM models
+└── dependencies.py  # Depends() providers for this feature
+```
 
-Avoid:
+- Register new routers in `api/app/api/v1/router.py`
+- Settings go in `api/app/core/config.py` (Pydantic BaseSettings)
+- Shared DB session management in `api/app/db/`
 
-- Large route handlers
-- Broad `except Exception` blocks that hide failures
-- Silent fallbacks
-- Mutable default arguments
-- Global state for request-specific data
-- Copy-pasted validation logic
-- Adding dependencies without strong justification
+## Stack-Specific Anti-Patterns
+
+Do NOT:
+
+- Use `session.query(Model)` — use `select(Model)` (SQLAlchemy 2.0)
+- Use `@validator` — use `@field_validator` (Pydantic v2)
+- Use `class Config:` in Pydantic models — use `model_config = ConfigDict(...)`
+- Create global DB sessions — use `Depends(get_async_session)`
+- Mix sync and async DB calls in one handler
+- Use `app.on_event("startup")` — use lifespan context manager
+- Return `dict` from handlers — always return typed Pydantic models
+- Put business logic in router handlers — delegate to service layer
 
 ## Testing Expectations
 
