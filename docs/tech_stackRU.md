@@ -19,7 +19,7 @@
 | Язык frontend | `TypeScript` | Основной язык реализации frontend |
 | Framework frontend | `React` | Пользовательский интерфейс notebook |
 | Build tool frontend | `Vite` | Development server и build pipeline frontend |
-| Язык backend | `Python 3.11+` | Основной язык реализации backend |
+| Язык backend | `Python 3.12+` | Основной язык реализации backend |
 | Framework backend | `FastAPI` | HTTP API слой |
 | Конфигурация backend | `Pydantic Settings` | Конфигурация через окружение |
 | Сервер backend | `Uvicorn` | ASGI application server |
@@ -41,9 +41,23 @@
 
 Подтвержденный frontend stack:
 
-- `React`
-- `TypeScript`
-- `Vite`
+- `React 18`
+- `TypeScript 5.6`
+- `Vite 8`
+- `Zustand 5` (глобальное состояние, slice composition pattern)
+- `TanStack React Query 5` (server state)
+- `React Router v7` (client-side routing, `createBrowserRouter`)
+- `shadcn/ui` + `Radix UI` + `Tailwind CSS 3` (component layer)
+- `Zod 4` (schema validation)
+- `CodeMirror 6` через `@uiw/react-codemirror` (редактор кодовых блоков)
+- `Dexie 4` (обёртка над IndexedDB)
+- `Recharts` (графики)
+- `lucide-react` (иконки)
+- `pnpm` (пакетный менеджер)
+- `Vitest 4` + `React Testing Library` (unit и component тесты)
+- `MSW 2` (мокирование API в тестах)
+- `Playwright 1.54` (end-to-end тесты)
+- `steiger` (линтинг FSD-архитектуры)
 
 Frontend отвечает за:
 
@@ -65,11 +79,15 @@ Frontend также владеет:
 
 Подтвержденный backend stack:
 
-- `Python 3.11+`
+- `Python 3.12+`
 - `FastAPI`
-- `Pydantic Settings`
+- `Pydantic v2` и `Pydantic Settings`
+- `SQLAlchemy 2.0 ORM` (async engine, стиль `select()`)
+- `Alembic` (миграции схемы)
+- `psycopg (binary) v3` (async-драйвер для PostgreSQL 16)
 - `Uvicorn`
-- `PostgreSQL`
+- `PostgreSQL 16`
+- `pytest` + `FastAPI TestClient` (backend тесты)
 
 Backend отвечает за:
 
@@ -146,13 +164,16 @@ Execution runtime остается отдельной архитектурной
 
 ## 10. Quality и development foundation
 
-Сейчас в проекте уже есть следующая development foundation:
+Подтвержденная quality и development foundation включает:
 
-- frontend linting через `ESLint`
-- backend test foundation через `Pytest`
+- frontend linting через `ESLint`; FSD-архитектурный линтинг через `steiger`
+- frontend unit и component тесты с `Vitest 4` + `React Testing Library`
+- мокирование API в frontend-тестах через `MSW 2`
+- end-to-end тесты с `Playwright 1.54`
+- backend тесты с `pytest` + `FastAPI TestClient`
 - backend API self-documentation через FastAPI OpenAPI
 
-Это часть текущего foundation, но это еще не весь итоговый testing и CI/CD stack.
+CI/CD tooling пока не зафиксирован (см. Раздел 11).
 
 ## 11. Отложенные технологические решения
 
@@ -160,17 +181,10 @@ Execution runtime остается отдельной архитектурной
 
 | Область | Возможные варианты | Рекомендуемая отправная точка для разбора |
 |---|---|---|
-| Управление состоянием frontend | `React Context + useReducer`, `Zustand`, `Redux Toolkit`, `TanStack Query` только для server state | `Zustand` для состояния notebook editor; `TanStack Query` добавлять только при росте сложности server state |
-| Frontend routing | `React Router`, `TanStack Router`, минимальный первый slice без роутинга | `React Router` |
-| UI component layer | custom components с design tokens, `shadcn/ui`, `MUI`, `Chakra UI` | custom components плюс выборочное использование `shadcn/ui` primitives |
-| Charting library | `Recharts`, `Apache ECharts`, `Chart.js`, `Observable Plot` | `Recharts` для простых charts в Version 1 |
 | Rich text editing | обычный `Markdown` textarea, `TipTap`, `Lexical` | обычный `Markdown` textarea для Version 1 |
-| Backend data access | `SQLAlchemy ORM`, `SQLAlchemy Core`, `SQLModel` | `SQLAlchemy ORM` или `SQLAlchemy Core` |
-| Migration tool | `Alembic`, raw SQL migrations, `yoyo-migrations` | `Alembic` |
 | Background jobs | отсутствие отдельного job layer, `FastAPI BackgroundTasks`, `RQ`, `Dramatiq`, `Celery` | без отдельной job-system или `FastAPI BackgroundTasks` для Version 1 |
 | Email provider | `AWS SES`, `Resend`, `Postmark`, `SendGrid`, `Mailgun` | `AWS SES` или `Resend` |
 | LLM provider | `OpenAI`, `Anthropic`, `AWS Bedrock`, `OpenRouter` | один основной provider за backend adapter |
-| Frontend test stack | `Vitest + React Testing Library`, `Playwright`, `Cypress`, смешанный stack | `Vitest + React Testing Library` плюс небольшой `Playwright` smoke layer |
 | CI/CD tooling | `GitHub Actions`, Docker image build pipeline, registry-based deploy pipeline, Terraform apply pipeline | `GitHub Actions` как основной CI/CD orchestrator |
 
 Эти решения должны быть зафиксированы позже в repo-specific архитектурных документах или ADR.

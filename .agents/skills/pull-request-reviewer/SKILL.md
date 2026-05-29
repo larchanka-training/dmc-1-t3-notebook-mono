@@ -114,6 +114,35 @@ Missing tests are review findings when behavior changed.
 - Are async/sync boundaries respected?
 - Does frontend code avoid unnecessary re-renders or large payloads?
 
+### Stack-Specific Review Checks
+
+**FSD Architecture:**
+- [ ] No upward imports (features → app, entities → features, etc.)
+- [ ] Cross-feature imports go through shared or entities, not directly
+- [ ] Public API rule: imports from `<slice>/index.ts` only
+- [ ] New slices registered in store composition
+
+**Backend (FastAPI):**
+- [ ] Route handlers are thin (logic in service layer)
+- [ ] `Depends()` used for injection (no global state access)
+- [ ] Pydantic v2 syntax (not v1 `@validator`, `class Config`)
+- [ ] SQLAlchemy 2.0 style (`select()`, not `session.query()`)
+- [ ] Migration included for schema changes
+
+**Frontend (React/Zustand/Query):**
+- [ ] Zustand slice uses `StateCreator` typing
+- [ ] React Query keys are consistent with existing patterns
+- [ ] Error/loading/empty states handled
+- [ ] MSW handlers added for new API endpoints in tests
+
+**AI-Generated Code Red Flags:**
+- [ ] No phantom imports (modules that don't exist)
+- [ ] No unused type definitions or dead code
+- [ ] No overly verbose JSDoc on obvious functions
+- [ ] No invented utility functions that duplicate existing ones
+- [ ] No arbitrary abstractions for one-time operations
+- [ ] Dependencies actually exist in package.json / requirements.txt
+
 ## Comment Severity
 
 Use clear severity labels.
@@ -134,41 +163,15 @@ Comments without a severity label are treated as required only when the issue cl
 
 ## Review Style
 
-Good review comments are:
-
-- Specific
-- Actionable
-- Tied to code behavior
-- Polite but direct
-- Focused on the code, not the author
-- Clear about whether the comment blocks merge
-
-Avoid:
-
-- Vague comments like "seems wrong"
-- Personal preference without project basis
-- Rewriting large sections without explaining the issue
-- Asking for unrelated cleanup
-- Rubber-stamp "LGTM" without evidence
-- Blocking on optional style preferences
+- Be specific, actionable, and tied to code behavior
+- Be polite but direct; focus on the code, not the author
+- Make clear whether the comment blocks merge
+- Avoid vague comments, personal preference without project basis, or rubber-stamp "LGTM"
 
 ## PR Size Assessment
 
-Evaluate whether the PR is reviewable.
-
-Guidelines:
-
-- Around 100 changed lines: usually good
-- Around 300 changed lines: acceptable if cohesive
-- Around 1000 changed lines: likely too large unless mostly generated, deleted, or mechanical
-
-Ask for splitting when:
-
-- The PR mixes refactoring and behavior change
-- The PR changes unrelated systems
-- The PR cannot be understood in one review session
-- The PR lacks clear checkpoints
-- The PR introduces a broad abstraction and uses it everywhere at once
+- ~100 lines: good. ~300 lines: acceptable if cohesive. ~1000 lines: likely too large.
+- Ask for splitting when the PR mixes refactoring and behavior change, changes unrelated systems, or cannot be understood in one review session.
 
 ## Merge Recommendation
 
