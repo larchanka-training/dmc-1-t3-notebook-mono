@@ -1,0 +1,68 @@
+name: Preview Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to clean up'
+        required: true
+
+env:
+  AWS_REGION: eu-north-1
+  PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+
+jobs:
+  cleanup-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Cache Terraform providers
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: terraform-providers-${{ hashFiles('**/.terraform.lock.hcl') }}
+
+      - name: Terraform init (preview workspace)
+        working-directory: infra/terraform/environments/preview
+        run: |
+          terraform init \
+            -backend-config="bucket=t3-tfstate-867633231218" \
+            -backend-config="key=preview/pr-${{ env.PR_NUMBER }}/terraform.tfstate" \
+            -backend-config="region=eu-north-1" \
+            -backend-config="dynamodb_table=t3-tfstate-lock"
+
+      - name: Terraform destroy
+        working-directory: infra/terraform/environments/preview
+        run: |
+          terraform destroy -auto-approve \
+            -var="pr_number=${{ env.PR_NUMBER }}" \
+            -var="api_image_uri=unused"
+
+      - name: Delete ECR images for this PR
+        run: |
+          IMAGES=$(aws ecr list-images \
+            --repository-name t3-api \
+            --filter "tagStatus=TAGGED" \
+            --query "imageIds[?starts_with(imageTag, 'pr-${{ env.PR_NUMBER }}-')]" \
+            --output json)
+          if [ "$IMAGES" != "[]" ]; then
+            aws ecr batch-delete-image \
+              --repository-name t3-api \
+              --image-ids "$IMAGES"
+          fi
