@@ -12,9 +12,9 @@ on:
         type: string
 
 env:
-  AWS_REGION: eu-north-1
-  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com
-  ECR_REPOSITORY: t3-api
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+  ECR_REPOSITORY: ${{ vars.AWS_REPO_NAME }}
 
 jobs:
   deploy-production:
