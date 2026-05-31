@@ -61,7 +61,7 @@ jobs:
       - name: Cache Terraform providers
         uses: actions/cache@v4
         with:
-          path: ~/.terraform.d/plugin-cache
+          path: ${{ env.HOME }}/.terraform.d/plugin-cache
           key: terraform-providers-${{ hashFiles('infra/terraform/environments/prod/.terraform.lock.hcl') }}
 
       - name: Setup Terraform
@@ -72,15 +72,15 @@ jobs:
       - name: Terraform init (prod)
         working-directory: infra/terraform/environments/prod
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: ${{ env.HOME }}/.terraform.d/plugin-cache
         run: |
-          mkdir -p ~/.terraform.d/plugin-cache
+          mkdir -p "$HOME/.terraform.d/plugin-cache"
           terraform init
 
       - name: Terraform apply
         working-directory: infra/terraform/environments/prod
         env:
-          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+          TF_PLUGIN_CACHE_DIR: ${{ env.HOME }}/.terraform.d/plugin-cache
         run: |
           terraform apply -auto-approve \
             -var="api_image_uri=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:prod-${{ github.sha }}"
