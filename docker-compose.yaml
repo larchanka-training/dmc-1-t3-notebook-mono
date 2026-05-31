@@ -3,6 +3,7 @@ services:
     build:
       context: ./ui
       dockerfile: Dockerfile
+      target: builder   # stop at builder stage; nginx production stage is not used locally
     ports:
       - "3000:5173"
     volumes:
@@ -14,8 +15,7 @@ services:
       postgres:
         condition: service_healthy
     stdin_open: true
-    command: >
-      sh -c "cd /home/app && npm install --include=optional && npm run dev"
+    command: pnpm dev
 
   api:
     build:

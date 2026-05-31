@@ -1,0 +1,90 @@
+name: Production Deploy
+
+on:
+  push:
+    branches: [main, DevOps]
+  workflow_dispatch: # forced / manual production deploy
+    inputs:
+      reason:
+        description: 'Reason for forced deploy (for audit log)'
+        required: false
+        default: 'Manual forced deploy'
+        type: string
+
+env:
+  AWS_REGION: eu-north-1
+  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com
+  ECR_REPOSITORY: t3-api
+
+jobs:
+  deploy-production:
+    name: Deploy production
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log deploy reason (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "Forced deploy triggered — reason: ${{ inputs.reason }}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:prod-${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha,scope=api-prod
+          cache-to: type=gha,mode=max,scope=api-prod
+
+      - name: Cache Terraform providers
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: terraform-providers-${{ hashFiles('infra/terraform/environments/prod/.terraform.lock.hcl') }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init (prod)
+        working-directory: infra/terraform/environments/prod
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+        run: |
+          mkdir -p ~/.terraform.d/plugin-cache
+          terraform init
+
+      - name: Terraform apply
+        working-directory: infra/terraform/environments/prod
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+        run: |
+          terraform apply -auto-approve \
+            -var="api_image_uri=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:prod-${{ github.sha }}"
+
+      - name: Wait for AppRunner service RUNNING
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services \
+            --query "ServiceSummaryList[?ServiceName=='t3-api-prod'].ServiceArn" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          aws apprunner wait service-running \
+            --service-arn "$SERVICE_ARN" \
+            --region ${{ env.AWS_REGION }}

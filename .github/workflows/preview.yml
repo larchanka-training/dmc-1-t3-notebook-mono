@@ -1,0 +1,107 @@
+name: Preview Deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch: # forced / manual run
+    inputs:
+      pr_number:
+        description: 'PR number to (re)deploy preview for'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: eu-north-1
+  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com
+  ECR_REPOSITORY: t3-api
+  # Prefer event PR number; fall back to manual input when dispatched manually
+  PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+
+jobs:
+  deploy-preview:
+    name: Deploy preview for PR-${{ github.event.pull_request.number || inputs.pr_number }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # for posting PR comment
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:pr-${{ env.PR_NUMBER }}-${{ github.sha }}
+          cache-from: type=gha,scope=api-pr-${{ env.PR_NUMBER }}
+          cache-to: type=gha,mode=max,scope=api-pr-${{ env.PR_NUMBER }}
+
+      - name: Cache Terraform providers
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: terraform-providers-${{ hashFiles('infra/terraform/environments/preview/.terraform.lock.hcl') }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init (preview workspace)
+        working-directory: infra/terraform/environments/preview
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+        run: |
+          mkdir -p ~/.terraform.d/plugin-cache
+          terraform init \
+            -backend-config="bucket=t3-tfstate-867633231218" \
+            -backend-config="key=preview/pr-${{ env.PR_NUMBER }}/terraform.tfstate" \
+            -backend-config="region=eu-north-1" \
+            -backend-config="dynamodb_table=t3-tfstate-lock"
+
+      - name: Terraform apply
+        id: tf_apply
+        working-directory: infra/terraform/environments/preview
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+        run: |
+          terraform apply -auto-approve \
+            -var="pr_number=${{ env.PR_NUMBER }}" \
+            -var="api_image_uri=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:pr-${{ env.PR_NUMBER }}-${{ github.sha }}"
+          echo "api_url=$(terraform output -raw preview_api_url)" >> $GITHUB_OUTPUT
+
+      - name: Update Amplify branch VITE_API_URL
+        run: |
+          aws amplify update-branch \
+            --app-id "${{ vars.AMPLIFY_APP_ID }}" \
+            --branch-name "${{ github.head_ref }}" \
+            --environment-variables "VITE_API_URL=https://${{ steps.tf_apply.outputs.api_url }}" \
+            --region ${{ env.AWS_REGION }} || true
+
+      - name: Post preview URLs as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const apiUrl = `https://${{ steps.tf_apply.outputs.api_url }}`;
+            const uiUrl = `https://pr-${{ env.PR_NUMBER }}.${{ vars.AMPLIFY_APP_ID }}.amplifyapp.com`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## Preview Deployment\n\n| Service | URL |\n|---|---|\n| UI | ${uiUrl} |\n| API | ${apiUrl} |\n\nDeployed from commit \`${{ github.sha }}\``
+            });
