@@ -28,7 +28,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           DEPLOY_REASON: ${{ inputs.reason }}
-        run: echo "Forced deploy triggered - reason: $DEPLOY_REASON"
+        run: |
+          echo "Forced deploy triggered - reason: $DEPLOY_REASON"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
