@@ -12,9 +12,9 @@ terraform {
     # The state KEY is passed at `terraform init` time via -backend-config:
     #   -backend-config="key=preview/pr-{N}/terraform.tfstate"
     # See .github/workflows/preview.yml and cleanup.yml for the exact command.
-    bucket         = "t3-tfstate-867633231218"
+    bucket         = "dmc-1-t3-notebook-terraform-state"
     region         = "eu-north-1"
-    dynamodb_table = "t3-tfstate-lock"
+    dynamodb_table = "dmc-1-t3-notebook-terraform-lock"
     encrypt        = true
   }
 }

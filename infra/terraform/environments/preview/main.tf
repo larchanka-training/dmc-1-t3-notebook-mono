@@ -19,7 +19,7 @@ locals {
 data "terraform_remote_state" "prod" {
   backend = "s3"
   config = {
-    bucket = "t3-tfstate-867633231218"
+    bucket = "dmc-1-t3-notebook-terraform-state"
     key    = "prod/terraform.tfstate"
     region = "eu-north-1"
   }

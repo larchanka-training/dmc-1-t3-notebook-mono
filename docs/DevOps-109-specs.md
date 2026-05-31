@@ -105,8 +105,8 @@ All names use `t3-` prefix. The word "team" is excluded from all names.
 | VPC | `t3-vpc` | `t3-vpc` |
 | Security groups | `t3-{purpose}-sg` | `t3-api-sg` |
 | IAM roles | `t3-{service}-role` | `t3-apprunner-role` |
-| S3 Terraform state bucket | `t3-tfstate-867633231218` | — |
-| DynamoDB lock table | `t3-tfstate-lock` | — |
+| S3 Terraform state bucket | `dmc-1-t3-notebook-terraform-state` | — |
+| DynamoDB lock table | `dmc-1-t3-notebook-terraform-lock` | — |
 | Secrets Manager paths | `t3/{env}/{name}` | `t3/prod/database-url` |
 
 ---
@@ -172,10 +172,10 @@ variable "api_image_uri" {
 ```hcl
 terraform {
   backend "s3" {
-    bucket         = "t3-tfstate-867633231218"
+    bucket         = "dmc-1-t3-notebook-terraform-state"
     key            = "preview/pr-${var.pr_number}/terraform.tfstate"
     region         = "eu-north-1"
-    dynamodb_table = "t3-tfstate-lock"
+    dynamodb_table = "dmc-1-t3-notebook-terraform-lock"
     encrypt        = true
   }
 }
@@ -461,9 +461,9 @@ on:
         type: string
 
 env:
-  AWS_REGION: eu-north-1
-  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com
-  ECR_REPOSITORY: t3-api
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+  ECR_REPOSITORY: ${{ vars.AWS_REPO_NAME }}
   # Prefer event PR number; fall back to manual input when dispatched manually
   PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
 
@@ -476,6 +476,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -508,10 +511,10 @@ jobs:
         working-directory: infra/terraform/environments/preview
         run: |
           terraform init \
-            -backend-config="bucket=t3-tfstate-867633231218" \
+            -backend-config="bucket=dmc-1-t3-notebook-terraform-state" \
             -backend-config="key=preview/pr-${{ env.PR_NUMBER }}/terraform.tfstate" \
             -backend-config="region=eu-north-1" \
-            -backend-config="dynamodb_table=t3-tfstate-lock"
+            -backend-config="dynamodb_table=dmc-1-t3-notebook-terraform-lock"
 
       - name: Terraform apply
         id: tf_apply
@@ -563,9 +566,9 @@ on:
         type: string
 
 env:
-  AWS_REGION: eu-north-1
-  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com
-  ECR_REPOSITORY: t3-api
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+  ECR_REPOSITORY: ${{ vars.AWS_REPO_NAME }}
 
 jobs:
   deploy-production:
@@ -573,6 +576,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log deploy reason (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          DEPLOY_REASON: ${{ inputs.reason }}
+        run: |
+          echo "Forced deploy triggered - reason: $DEPLOY_REASON"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -662,10 +675,10 @@ jobs:
         working-directory: infra/terraform/environments/preview
         run: |
           terraform init \
-            -backend-config="bucket=t3-tfstate-867633231218" \
+            -backend-config="bucket=dmc-1-t3-notebook-terraform-state" \
             -backend-config="key=preview/pr-${{ env.PR_NUMBER }}/terraform.tfstate" \
             -backend-config="region=eu-north-1" \
-            -backend-config="dynamodb_table=t3-tfstate-lock"
+            -backend-config="dynamodb_table=dmc-1-t3-notebook-terraform-lock"
 
       - name: Terraform destroy
         working-directory: infra/terraform/environments/preview
@@ -793,6 +806,7 @@ Amplify's built-in cache persists `node_modules` and the pnpm content store betw
 |---|---|
 | `AWS_ACCOUNT_ID` | `867633231218` |
 | `AWS_REGION` | `eu-north-1` |
+| `AWS_REPO_NAME` | `jsnotes` |
 | `AMPLIFY_APP_ID` | Terraform output after first apply |
 
 ### 11.2 GitHub Repository Secrets (already exist)
@@ -876,15 +890,15 @@ All permissions are scoped to `t3-*` resource ARNs to prevent interfering with o
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
       "Resource": [
-        "arn:aws:s3:::t3-tfstate-867633231218",
-        "arn:aws:s3:::t3-tfstate-867633231218/*"
+        "arn:aws:s3:::dmc-1-t3-notebook-terraform-state",
+        "arn:aws:s3:::dmc-1-t3-notebook-terraform-state/*"
       ]
     },
     {
       "Sid": "TerraformStateLock",
       "Effect": "Allow",
       "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"],
-      "Resource": "arn:aws:dynamodb:eu-north-1:867633231218:table/t3-tfstate-lock"
+      "Resource": "arn:aws:dynamodb:eu-north-1:867633231218:table/dmc-1-t3-notebook-terraform-lock"
     },
     {
       "Sid": "SecretsManager",
@@ -935,7 +949,7 @@ CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --
 
 | Step | Action |
 |---|---|
-| 1.1 | Write and apply `infra/terraform/bootstrap/` with local state to create S3 bucket `t3-tfstate-867633231218` (versioning enabled, AES-256 encryption) and DynamoDB table `t3-tfstate-lock` |
+| 1.1 | Write and apply `infra/terraform/bootstrap/` with local state to create S3 bucket `dmc-1-t3-notebook-terraform-state` (versioning enabled, AES-256 encryption) and DynamoDB table `dmc-1-t3-notebook-terraform-lock` |
 | 1.2 | Create ECR repository `t3-api` manually or via bootstrap Terraform |
 | 1.3 | Store DB master password in Secrets Manager: `t3/prod/database-url`, `t3/preview/database-url` |
 | 1.4 | Store GitHub personal access token in Secrets Manager: `t3/github-token` |

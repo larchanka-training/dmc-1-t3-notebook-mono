@@ -12,10 +12,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "t3-tfstate-867633231218"
+    bucket         = "dmc-1-t3-notebook-terraform-state"
     key            = "prod/terraform.tfstate"
     region         = "eu-north-1"
-    dynamodb_table = "t3-tfstate-lock"
+    dynamodb_table = "dmc-1-t3-notebook-terraform-lock"
     encrypt        = true
   }
 }
