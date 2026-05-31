@@ -107,7 +107,7 @@ resource "aws_route_table_association" "private" {
 # ---------------------------------------------------------------------------
 resource "aws_security_group" "apprunner" {
   name        = "${var.prefix}-apprunner-sg"
-  description = "AppRunner VPC connector — outbound traffic to private resources"
+  description = "AppRunner VPC connector - outbound traffic to private resources"
   vpc_id      = aws_vpc.main.id
 
   egress {

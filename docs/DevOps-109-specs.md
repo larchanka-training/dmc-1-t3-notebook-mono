@@ -970,7 +970,7 @@ CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --
 |---|---|
 | 3.1 | Write `modules/network/` — VPC, 2 private subnets, 2 public subnets, IGW, NAT GW |
 | 3.2 | Write `modules/rds/` — RDS PostgreSQL 16, subnet group, security group |
-| 3.3 | Write `modules/ecr/` — ECR repository, lifecycle policy (keep 20 prod images, 10 PR images, expire PR images after 14 days) |
+| 3.3 | Write `modules/ecr/` — ECR repository, lifecycle policy (keep 20 prod images, 10 PR images, remove untagged images after 1 day) |
 | 3.4 | Write `modules/apprunner/` — reusable AppRunner service with VPC connector |
 | 3.5 | Write `environments/prod/` — provisions `t3-api-prod`, RDS prod database, Amplify `t3-ui` |
 | 3.6 | Write `environments/preview/` — provisions `t3-api-pr-{N}`, connects to preview RDS database |
