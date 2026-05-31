@@ -61,7 +61,7 @@ jobs:
       - name: Cache Terraform providers
         uses: actions/cache@v4
         with:
-          path: ${{ env.HOME }}/.terraform.d/plugin-cache
+          path: /home/runner/.terraform.d/plugin-cache
           key: terraform-providers-${{ hashFiles('infra/terraform/environments/prod/.terraform.lock.hcl') }}
 
       - name: Setup Terraform
@@ -71,18 +71,14 @@ jobs:
 
       - name: Terraform init (prod)
         working-directory: infra/terraform/environments/prod
-        env:
-          TF_PLUGIN_CACHE_DIR: ${{ env.HOME }}/.terraform.d/plugin-cache
         run: |
           mkdir -p "$HOME/.terraform.d/plugin-cache"
-          terraform init
+          TF_PLUGIN_CACHE_DIR="$HOME/.terraform.d/plugin-cache" terraform init
 
       - name: Terraform apply
         working-directory: infra/terraform/environments/prod
-        env:
-          TF_PLUGIN_CACHE_DIR: ${{ env.HOME }}/.terraform.d/plugin-cache
         run: |
-          terraform apply -auto-approve \
+          TF_PLUGIN_CACHE_DIR="$HOME/.terraform.d/plugin-cache" terraform apply -auto-approve \
             -var="api_image_uri=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:prod-${{ github.sha }}"
 
       - name: Wait for AppRunner service RUNNING
