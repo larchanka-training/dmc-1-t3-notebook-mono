@@ -127,6 +127,12 @@ Because the final public domain is not purchased yet, the preview solution must 
 
 Use one shared preview ALB for `t3` and route each PR by path prefix on the ALB DNS name.
 
+Architecture guardrails for this phase:
+
+- the backend public API contract must remain under `/api/v1`
+- authenticated preview flows must preserve the secure `HTTP-only` session-cookie model
+- Google OAuth preview support requires a stable HTTPS callback host that can be registered with the provider
+
 Preview URL pattern:
 
 - UI: `http://<t3-preview-alb-dns>/pr-<number>/`
@@ -139,17 +145,42 @@ Why this is the best temporary option:
 - it reduces cost compared with fully isolated load balancers
 - it keeps all preview entry points predictable
 
+Important limitation:
+
+- plain ALB DNS + path-prefix routing is acceptable for temporary infrastructure validation
+- it is not sufficient by itself for full authenticated product validation because the project uses secure session cookies and supports Google OAuth
+- any preview that must exercise real authenticated browser flows must be exposed through HTTPS on a host model that supports cookie and callback isolation
+
 ### 6.3 Required application adjustments for path-based previews
 
 The UI build must support a configurable base path for previews, for example:
 
 - `VITE_APP_BASE_PATH=/pr-42/`
-- `VITE_API_URL=/pr-42/api`
+- `VITE_API_URL` must still resolve to backend routes exposed under `/api/v1`
 
 The ALB and reverse proxy rules in AWS must route:
 
 - `/pr-<number>/` to the preview UI target group
 - `/pr-<number>/api/*` to the preview API target group
+
+Additional routing rules required for architecture compatibility:
+
+- do not change FastAPI route groups away from `/api/v1`
+- if path-based previews are kept, add an HTTP proxy layer that strips the `/pr-<number>` prefix before the request reaches the API service
+- ALB listener rules alone are not enough to preserve the backend contract because they can match paths but do not become the backend public API design
+- if that proxy layer is not introduced, switch preview API routing to a host-based model before implementation
+
+Additional UI rules required for architecture compatibility:
+
+- the React router must support a configurable basename for preview builds
+- existing canonical routes remain `/login`, `/notebooks`, and `/notebooks/:notebookId` inside that basename
+- preview-specific routing must not change local Docker defaults or the root-path behavior used by shared environments
+
+Additional auth rules required for architecture compatibility:
+
+- preview auth must continue to use a backend-managed secure `HTTP-only` session cookie
+- when multiple previews share one parent host, cookie scope must be isolated explicitly by host or cookie path so one PR preview cannot reuse another preview session implicitly
+- Google OAuth should be enabled only for preview hosts whose HTTPS callback URL can be registered and validated; otherwise keep Google OAuth validation in shared `dev` or `prod` environments until host-based preview URLs are available
 
 This does not change local Docker behavior. It only adds preview-specific runtime variables for AWS deployments.
 
@@ -166,12 +197,20 @@ Terraform should be written so this later migration only changes routing and DNS
 
 Before the final domain is available, production can use:
 
-- ALB DNS name for internal validation
+- ALB DNS name for internal infrastructure validation only
+
+Production URL guardrails:
+
+- any environment used for real authenticated browser validation must be reachable over HTTPS
+- the production-like entrypoint must preserve the secure `HTTP-only` session-cookie contract
+- Google OAuth requires a stable HTTPS callback URL and must not rely on a raw ALB DNS placeholder as the long-term user-facing entrypoint
+- if the final public domain is not purchased yet, use a temporary team-controlled HTTPS hostname for user-facing validation rather than treating the ALB DNS name as the real production URL
 
 After domain purchase:
 
 - UI: `https://<chosen-domain>`
 - API: `https://api.<chosen-domain>`
+- API routes on that host remain exposed under `/api/v1`
 
 TLS should be handled with `ACM` certificates attached to the ALB.
 
@@ -448,6 +487,8 @@ Responsibilities:
 - lint and test UI and API
 - build Docker images without deployment when needed
 - validate Terraform formatting and plan for changed environments
+- validate that preview-specific configuration preserves the frontend route model and the backend `/api/v1` contract
+- fail fast when preview configuration would require weakening the secure-cookie auth model outside an explicitly documented non-auth validation mode
 
 ### 14.3 Preview deploy workflow
 
@@ -472,6 +513,10 @@ Responsibilities:
 - run Terraform apply for preview infrastructure
 - register or update preview routing rules
 - publish preview URLs in the workflow summary and optionally in a PR comment
+- inject preview-specific UI routing variables such as the router basename when path-based previews are used
+- preserve the backend public API under `/api/v1`; if path-based routing is used, provision the required prefix-stripping proxy layer or stop the rollout
+- declare in the workflow summary whether the resulting preview supports full authenticated validation or infrastructure-only validation
+- enable Google OAuth in preview only when the preview host has a valid registered HTTPS callback URL; otherwise keep OAuth validation in shared environments
 
 ### 14.4 Preview destroy workflow
 
@@ -511,6 +556,8 @@ Responsibilities:
 - run Terraform apply for production
 - deploy ECS task definition updates
 - publish the resulting application URLs in the workflow summary
+- publish the HTTPS user-facing URL separately from any raw ALB validation URL
+- verify that the deployed entrypoint matches the secure-cookie and callback requirements for authenticated flows
 
 ### 14.6 Concurrency control
 
@@ -662,6 +709,11 @@ The implementation based on this plan is complete when all of the following are 
 - AWS resource names and tags do not conflict with other teams
 - local `docker-compose` workflow remains unchanged and operational
 - `api/Dockerfile` and `ui/Dockerfile` remain valid for local development and CI/CD image builds
+- preview and production routing preserve the canonical backend API contract under `/api/v1`
+- path-based previews are either backed by a prefix-stripping proxy layer or explicitly replaced by host-based routing before rollout
+- any environment used for authenticated browser validation keeps the secure `HTTP-only` cookie model over HTTPS
+- preview auth isolation rules are explicit so one PR preview cannot accidentally share browser auth state with another
+- Google OAuth validation runs only on environments with a valid registered HTTPS callback URL; when preview hosts cannot satisfy that requirement, the plan explicitly limits OAuth validation to shared environments instead of silently breaking it
 
 ## 20. Recommended Next Implementation Artifacts
 
