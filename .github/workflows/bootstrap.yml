@@ -54,6 +54,16 @@ jobs:
       - name: Terraform validate
         run: terraform -chdir=infra/bootstrap validate
 
+      - name: Import existing bootstrap resources
+        run: |
+          if aws s3api head-bucket --bucket "${STATE_BUCKET_NAME}" 2>/dev/null; then
+            terraform -chdir=infra/bootstrap import aws_s3_bucket.terraform_state "${STATE_BUCKET_NAME}" || true
+          fi
+
+          if aws dynamodb describe-table --table-name "${LOCK_TABLE_NAME}" >/dev/null 2>&1; then
+            terraform -chdir=infra/bootstrap import aws_dynamodb_table.terraform_lock "${LOCK_TABLE_NAME}" || true
+          fi
+
       - name: Terraform apply
         run: |
           terraform -chdir=infra/bootstrap apply -auto-approve \
