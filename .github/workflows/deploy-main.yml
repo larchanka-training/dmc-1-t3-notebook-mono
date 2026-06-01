@@ -1,0 +1,106 @@
+name: Deploy Main
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: eu-north-1
+  ECR_REGISTRY: 867633231218.dkr.ecr.eu-north-1.amazonaws.com
+  TF_STATE_BUCKET: dmc-1-t3-notebook-terraform-state
+  TF_LOCK_TABLE: dmc-1-t3-notebook-terraform-lock
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  deploy-main:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: main-${{ github.sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform apply shared root
+        run: |
+          terraform -chdir=infra/env/shared init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=t3/dmc-1-t3-notebook-mono/shared/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
+          terraform -chdir=infra/env/shared apply -auto-approve
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push UI image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ui
+          file: ./ui/Dockerfile
+          target: production
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/t3-notebook-ui:${{ env.IMAGE_TAG }}
+            ${{ env.ECR_REGISTRY }}/t3-notebook-ui:main-latest
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-ui:buildcache
+          cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-ui:buildcache,mode=max
+          build-args: |
+            VITE_API_URL=/api/v1
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          file: ./api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/t3-notebook-api:${{ env.IMAGE_TAG }}
+            ${{ env.ECR_REGISTRY }}/t3-notebook-api:main-latest
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-api:buildcache
+          cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-api:buildcache,mode=max
+
+      - name: Terraform apply production root
+        run: |
+          terraform -chdir=infra/env/prod init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=t3/dmc-1-t3-notebook-mono/prod/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
+          terraform -chdir=infra/env/prod apply -auto-approve \
+            -var "ui_image=${ECR_REGISTRY}/t3-notebook-ui:${IMAGE_TAG}" \
+            -var "api_image=${ECR_REGISTRY}/t3-notebook-api:${IMAGE_TAG}" \
+            -var "deploy_nonce=${GITHUB_SHA}"
+
+      - name: Write summary
+        run: |
+          validation_url=$(terraform -chdir=infra/env/prod output -raw validation_url)
+          api_base_url=$(terraform -chdir=infra/env/prod output -raw api_base_url)
+          {
+            echo "## Main deployment"
+            echo ""
+            echo "- Validation URL: ${validation_url}"
+            echo "- API base URL: ${api_base_url}"
+          } >> "$GITHUB_STEP_SUMMARY"
