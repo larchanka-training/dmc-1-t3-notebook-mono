@@ -1,6 +1,11 @@
 name: Bootstrap Terraform State
 
 on:
+  push:
+    branches:
+      - DevOps
+    paths:
+      - infra/bootstrap/**
   workflow_dispatch:
     inputs:
       state_bucket_name:
@@ -21,6 +26,8 @@ concurrency:
 
 env:
   AWS_REGION: eu-north-1
+  STATE_BUCKET_NAME: ${{ github.event.inputs.state_bucket_name || 'dmc-1-t3-notebook-terraform-state' }}
+  LOCK_TABLE_NAME: ${{ github.event.inputs.lock_table_name || 'dmc-1-t3-notebook-terraform-lock' }}
   TF_IN_AUTOMATION: "true"
 
 jobs:
@@ -50,14 +57,15 @@ jobs:
       - name: Terraform apply
         run: |
           terraform -chdir=infra/bootstrap apply -auto-approve \
-            -var "state_bucket_name=${{ inputs.state_bucket_name }}" \
-            -var "lock_table_name=${{ inputs.lock_table_name }}"
+            -var "state_bucket_name=${STATE_BUCKET_NAME}" \
+            -var "lock_table_name=${LOCK_TABLE_NAME}"
 
       - name: Write summary
         run: |
           {
             echo "## Terraform bootstrap"
             echo ""
-            echo "- State bucket: ${{ inputs.state_bucket_name }}"
-            echo "- Lock table: ${{ inputs.lock_table_name }}"
+            echo "- Trigger: ${{ github.event_name }}"
+            echo "- State bucket: ${STATE_BUCKET_NAME}"
+            echo "- Lock table: ${LOCK_TABLE_NAME}"
           } >> "$GITHUB_STEP_SUMMARY"
