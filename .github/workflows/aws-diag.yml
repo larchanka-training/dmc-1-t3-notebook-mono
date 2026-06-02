@@ -16,6 +16,14 @@ on:
         description: AWS region for Cloud Map lookup
         required: true
         default: eu-north-1
+      deploy_user:
+        description: IAM user to inspect for effective permissions
+        required: true
+        default: deploy-user
+      managed_policy_arn:
+        description: Optional managed policy ARN to inspect directly
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -27,6 +35,8 @@ concurrency:
 env:
   AWS_REGION: ${{ inputs.aws_region || 'eu-north-1' }}
   NAMESPACE_NAME: ${{ inputs.namespace_name || 't3-notebook.internal' }}
+  DEPLOY_USER: ${{ inputs.deploy_user || 'deploy-user' }}
+  MANAGED_POLICY_ARN: ${{ inputs.managed_policy_arn || '' }}
 
 jobs:
   aws-diag:
@@ -51,6 +61,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "NAMESPACE_FOUND=false" >> "$GITHUB_ENV"
+          echo "LIST_TAGS_EXIT_CODE=0" >> "$GITHUB_ENV"
+
           namespace_id=$(aws servicediscovery list-namespaces \
             --region "$AWS_REGION" \
             --query "Namespaces[?Name=='$NAMESPACE_NAME'] | [0].Id" \
@@ -71,6 +84,11 @@ jobs:
 
           account_id=$(aws sts get-caller-identity --query Account --output text)
           namespace_arn="arn:aws:servicediscovery:$AWS_REGION:$account_id:namespace/$namespace_id"
+
+          echo "ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
+          echo "NAMESPACE_ID=$namespace_id" >> "$GITHUB_ENV"
+          echo "NAMESPACE_ARN=$namespace_arn" >> "$GITHUB_ENV"
+          echo "NAMESPACE_FOUND=true" >> "$GITHUB_ENV"
 
           echo "Found namespace id: $namespace_id"
           echo "Namespace ARN: $namespace_arn"
@@ -111,5 +129,240 @@ jobs:
               echo "$tags_output"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
-            exit $tags_exit_code
+          fi
+
+          echo "LIST_TAGS_EXIT_CODE=$tags_exit_code" >> "$GITHUB_ENV"
+
+      - name: Inspect deploy-user IAM attachments
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          set +e
+          attached_output=$(aws iam list-attached-user-policies \
+            --user-name "$DEPLOY_USER" \
+            --output json 2>&1)
+          attached_exit_code=$?
+
+          inline_output=$(aws iam list-user-policies \
+            --user-name "$DEPLOY_USER" \
+            --output json 2>&1)
+          inline_exit_code=$?
+          set -e
+
+          {
+            echo "## IAM user diagnostics"
+            echo ""
+            echo "- IAM user: $DEPLOY_USER"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ $attached_exit_code -eq 0 ]]; then
+            echo "$attached_output"
+            {
+              echo "- list-attached-user-policies: success"
+              echo ""
+              echo "### Attached managed policies"
+              echo '```json'
+              echo "$attached_output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "$attached_output"
+            {
+              echo "- list-attached-user-policies: failed"
+              echo ""
+              echo "### list-attached-user-policies stderr"
+              echo '```text'
+              echo "$attached_output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ $inline_exit_code -eq 0 ]]; then
+            echo "$inline_output"
+            {
+              echo "- list-user-policies: success"
+              echo ""
+              echo "### Inline policies"
+              echo '```json'
+              echo "$inline_output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "$inline_output"
+            {
+              echo "- list-user-policies: failed"
+              echo ""
+              echo "### list-user-policies stderr"
+              echo '```text'
+              echo "$inline_output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Inspect managed policy default versions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          policy_arns=()
+          if [[ -n "$MANAGED_POLICY_ARN" ]]; then
+            policy_arns+=("$MANAGED_POLICY_ARN")
+          else
+            set +e
+            attached_policy_arns=$(aws iam list-attached-user-policies \
+              --user-name "$DEPLOY_USER" \
+              --query 'AttachedPolicies[].PolicyArn' \
+              --output text 2>&1)
+            attached_policy_arns_exit_code=$?
+            set -e
+
+            if [[ $attached_policy_arns_exit_code -ne 0 ]]; then
+              {
+                echo "## Managed policy versions"
+                echo ""
+                echo "- Result: unable to list attached managed policies"
+                echo ""
+                echo "### list-attached-user-policies stderr"
+                echo '```text'
+                echo "$attached_policy_arns"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            if [[ -n "$attached_policy_arns" && "$attached_policy_arns" != "None" ]]; then
+              read -r -a policy_arns <<< "$attached_policy_arns"
+            fi
+          fi
+
+          {
+            echo "## Managed policy versions"
+            echo ""
+            if [[ ${#policy_arns[@]} -eq 0 ]]; then
+              echo "- Result: no managed policies selected for inspection"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for policy_arn in "${policy_arns[@]}"; do
+            set +e
+            policy_output=$(aws iam get-policy \
+              --policy-arn "$policy_arn" \
+              --output json 2>&1)
+            policy_exit_code=$?
+            set -e
+
+            if [[ $policy_exit_code -ne 0 ]]; then
+              {
+                echo "### $policy_arn"
+                echo ""
+                echo "- get-policy: failed"
+                echo '```text'
+                echo "$policy_output"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            default_version=$(echo "$policy_output" | jq -r '.Policy.DefaultVersionId')
+
+            set +e
+            version_output=$(aws iam get-policy-version \
+              --policy-arn "$policy_arn" \
+              --version-id "$default_version" \
+              --output json 2>&1)
+            version_exit_code=$?
+            set -e
+
+            {
+              echo "### $policy_arn"
+              echo ""
+              echo "- default version: $default_version"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [[ $version_exit_code -eq 0 ]]; then
+              echo "$version_output"
+              {
+                echo "- get-policy-version: success"
+                echo ""
+                echo "#### Default version document"
+                echo '```json'
+                echo "$version_output"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "$version_output"
+              {
+                echo "- get-policy-version: failed"
+                echo '```text'
+                echo "$version_output"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      - name: Simulate ListTagsForResource authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${NAMESPACE_FOUND:-false}" != "true" ]]; then
+            {
+              echo "## IAM simulation"
+              echo ""
+              echo "- Result: skipped because the namespace was not found"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          user_arn="arn:aws:iam::$ACCOUNT_ID:user/$DEPLOY_USER"
+
+          set +e
+          simulation_output=$(aws iam simulate-principal-policy \
+            --policy-source-arn "$user_arn" \
+            --action-names servicediscovery:ListTagsForResource \
+            --resource-arns "$NAMESPACE_ARN" \
+            --output json 2>&1)
+          simulation_exit_code=$?
+          set -e
+
+          {
+            echo "## IAM simulation"
+            echo ""
+            echo "- Policy source ARN: $user_arn"
+            echo "- Action: servicediscovery:ListTagsForResource"
+            echo "- Resource ARN: $NAMESPACE_ARN"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ $simulation_exit_code -eq 0 ]]; then
+            echo "$simulation_output"
+            {
+              echo "- simulate-principal-policy: success"
+              echo ""
+              echo "### Simulation result"
+              echo '```json'
+              echo "$simulation_output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "$simulation_output"
+            {
+              echo "- simulate-principal-policy: failed"
+              echo ""
+              echo "### simulate-principal-policy stderr"
+              echo '```text'
+              echo "$simulation_output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Fail if Cloud Map tag read is denied
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${LIST_TAGS_EXIT_CODE:-0}" != "0" ]]; then
+            echo "Cloud Map list-tags-for-resource failed earlier with exit code ${LIST_TAGS_EXIT_CODE}."
+            exit 1
           fi
