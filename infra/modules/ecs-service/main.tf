@@ -9,9 +9,9 @@ locals {
 
   ingress_sg_rules = {
     for rule in flatten([
-      for security_group_id in var.ingress_security_group_ids : [
+      for security_group_index, security_group_id in var.ingress_security_group_ids : [
         for port in local.ingress_ports : {
-          id                = "${security_group_id}-${port}"
+          id                = "${security_group_index}-${port}"
           security_group_id = security_group_id
           port              = port
         }
