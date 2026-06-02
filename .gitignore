@@ -41,6 +41,7 @@ docker-data/
 
 # Terraform local artifacts
 .terraform/
+.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 *.tfplan
