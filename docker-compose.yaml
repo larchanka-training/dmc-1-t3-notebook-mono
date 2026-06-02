@@ -37,7 +37,7 @@ services:
              fastapi dev app/main.py --host 0.0.0.0 --port 8000"
 
   postgres:
-    image: postgres:16
+    image: postgres:17
     volumes:
       - psql-data:/var/lib/postgresql/data
     environment:

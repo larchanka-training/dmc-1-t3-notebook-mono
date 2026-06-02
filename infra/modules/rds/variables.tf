@@ -39,7 +39,7 @@ variable "port" {
 variable "engine_version" {
   description = "PostgreSQL engine version."
   type        = string
-  default     = "16.4"
+  default     = "17"
 }
 
 variable "instance_class" {
