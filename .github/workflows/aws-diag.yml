@@ -1,0 +1,115 @@
+name: AWS Diagnostics
+
+on:
+  push:
+    branches:
+      - DevOps
+    paths:
+      - infra/diag/**
+  workflow_dispatch:
+    inputs:
+      namespace_name:
+        description: Cloud Map namespace name to inspect
+        required: true
+        default: t3-notebook.internal
+      aws_region:
+        description: AWS region for Cloud Map lookup
+        required: true
+        default: eu-north-1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-diag-${{ inputs.namespace_name }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ inputs.aws_region || 'eu-north-1' }}
+  NAMESPACE_NAME: ${{ inputs.namespace_name || 't3-notebook.internal' }}
+
+jobs:
+  aws-diag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Show AWS CLI version
+        run: aws --version
+
+      - name: Check Cloud Map namespace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          namespace_id=$(aws servicediscovery list-namespaces \
+            --region "$AWS_REGION" \
+            --query "Namespaces[?Name=='$NAMESPACE_NAME'] | [0].Id" \
+            --output text)
+
+          if [[ -z "$namespace_id" || "$namespace_id" == "None" ]]; then
+            {
+              echo "## Cloud Map namespace check"
+              echo ""
+              echo "- Namespace name: $NAMESPACE_NAME"
+              echo "- Region: $AWS_REGION"
+              echo "- Result: namespace not found"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "Namespace '$NAMESPACE_NAME' not found in region '$AWS_REGION'."
+            exit 0
+          fi
+
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          namespace_arn="arn:aws:servicediscovery:$AWS_REGION:$account_id:namespace/$namespace_id"
+
+          echo "Found namespace id: $namespace_id"
+          echo "Namespace ARN: $namespace_arn"
+
+          aws servicediscovery get-namespace \
+            --id "$namespace_id" \
+            --region "$AWS_REGION"
+
+          set +e
+          tags_output=$(aws servicediscovery list-tags-for-resource \
+            --resource-arn "$namespace_arn" \
+            --region "$AWS_REGION" 2>&1)
+          tags_exit_code=$?
+          set -e
+
+          {
+            echo "## Cloud Map namespace check"
+            echo ""
+            echo "- Namespace name: $NAMESPACE_NAME"
+            echo "- Region: $AWS_REGION"
+            echo "- Namespace ID: $namespace_id"
+            echo "- Namespace ARN: $namespace_arn"
+            echo "- get-namespace: success"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ $tags_exit_code -eq 0 ]]; then
+            echo "$tags_output"
+            {
+              echo "- list-tags-for-resource: success"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "$tags_output"
+            {
+              echo "- list-tags-for-resource: failed"
+              echo ""
+              echo "### list-tags-for-resource stderr"
+              echo '```text'
+              echo "$tags_output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit $tags_exit_code
+          fi
