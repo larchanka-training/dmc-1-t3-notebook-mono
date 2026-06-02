@@ -5,7 +5,7 @@ on:
     branches:
       - DevOps
     paths:
-      - docs/diag/infra/**
+      - docs/diag/aws/**
   workflow_dispatch:
     inputs:
       namespace_name:
