@@ -384,6 +384,38 @@ Why this separation is required:
 - backend lifecycle is different from product infrastructure lifecycle
 - accidental deletion or recreation of the backend is a high-impact operational risk
 
+### 11.6 Terraform plan-time determinism rules
+
+The Terraform implementation must be written so resource instance addressing is fully computable during `plan`.
+
+Mandatory rules:
+
+- `for_each` and `count` instance keys must be static and plan-time determinable
+- never derive `for_each` map keys from values created in the same apply, such as security group IDs, subnet IDs, target group ARNs, listener rule ARNs, or similar provider-generated identifiers
+- if a dynamic value is required, keep it in `each.value` and use a stable synthetic key such as an index-based or config-based key
+- avoid two-phase apply as the default strategy; `-target` is only an emergency recovery tool and must not be a normal deployment path
+
+Recommended pattern:
+
+- build `for_each` maps from static inputs, list indexes, or explicit user-defined keys
+- pass unknown-at-plan values as attributes inside the map value object
+
+Example pattern:
+
+```hcl
+# Good: stable key, dynamic values in object fields.
+for_each = {
+  for idx, rule in var.ingress_rules : "${idx}-${rule.port}" => {
+    port              = rule.port
+    security_group_id = rule.security_group_id
+  }
+}
+```
+
+CI validation requirement:
+
+- CI must run `terraform validate` and environment-scoped `terraform plan` for changed Terraform roots so plan-time key issues are detected before deployment
+
 ## 12. Naming, Tagging, and Collision Avoidance
 
 All AWS resources must use the `t3` prefix.
@@ -696,6 +728,18 @@ Mitigation:
 - dependency caching for `pnpm` and `pip`
 - immutable image tagging
 
+### 18.5 Terraform graph evaluation failures
+
+Risk:
+
+- Terraform `plan` fails with `Invalid for_each argument` when resource instance keys depend on apply-time values
+
+Mitigation:
+
+- enforce the plan-time determinism rules in Section 11.6
+- keep `for_each` keys static and move provider-generated values into `each.value`
+- run `terraform plan` in CI for each changed environment root before any apply step
+
 ## 19. Acceptance Criteria
 
 The implementation based on this plan is complete when all of the following are true:
@@ -714,6 +758,7 @@ The implementation based on this plan is complete when all of the following are 
 - any environment used for authenticated browser validation keeps the secure `HTTP-only` cookie model over HTTPS
 - preview auth isolation rules are explicit so one PR preview cannot accidentally share browser auth state with another
 - Google OAuth validation runs only on environments with a valid registered HTTPS callback URL; when preview hosts cannot satisfy that requirement, the plan explicitly limits OAuth validation to shared environments instead of silently breaking it
+- Terraform roots pass plan without instance-addressing failures caused by apply-time-derived `for_each` keys
 
 ## 20. Recommended Next Implementation Artifacts
 
