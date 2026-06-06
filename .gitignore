@@ -39,6 +39,13 @@ coverage/
 .docker/
 docker-data/
 
+# Terraform local artifacts
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+
 # TLS / cert artifacts (if generated locally)
 *.pem
 *.key
