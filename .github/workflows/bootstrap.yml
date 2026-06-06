@@ -1,0 +1,81 @@
+name: Bootstrap Terraform State
+
+on:
+  push:
+    branches:
+      - DevOps
+    paths:
+      - infra/bootstrap/**
+  workflow_dispatch:
+    inputs:
+      state_bucket_name:
+        description: S3 bucket name for Terraform state
+        required: true
+        default: dmc-1-t3-notebook-terraform-state
+      lock_table_name:
+        description: DynamoDB table name for Terraform state locking
+        required: true
+        default: dmc-1-t3-notebook-terraform-lock
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-bootstrap
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-north-1
+  STATE_BUCKET_NAME: ${{ github.event.inputs.state_bucket_name || 'dmc-1-t3-notebook-terraform-state' }}
+  LOCK_TABLE_NAME: ${{ github.event.inputs.lock_table_name || 'dmc-1-t3-notebook-terraform-lock' }}
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        run: terraform -chdir=infra/bootstrap init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir=infra/bootstrap validate
+
+      - name: Import existing bootstrap resources
+        run: |
+          if aws s3api head-bucket --bucket "${STATE_BUCKET_NAME}" 2>/dev/null; then
+            terraform -chdir=infra/bootstrap import aws_s3_bucket.terraform_state "${STATE_BUCKET_NAME}" || true
+          fi
+
+          if aws dynamodb describe-table --table-name "${LOCK_TABLE_NAME}" >/dev/null 2>&1; then
+            terraform -chdir=infra/bootstrap import aws_dynamodb_table.terraform_lock "${LOCK_TABLE_NAME}" || true
+          fi
+
+      - name: Terraform apply
+        run: |
+          terraform -chdir=infra/bootstrap apply -auto-approve \
+            -var "state_bucket_name=${STATE_BUCKET_NAME}" \
+            -var "lock_table_name=${LOCK_TABLE_NAME}"
+
+      - name: Write summary
+        run: |
+          {
+            echo "## Terraform bootstrap"
+            echo ""
+            echo "- Trigger: ${{ github.event_name }}"
+            echo "- State bucket: ${STATE_BUCKET_NAME}"
+            echo "- Lock table: ${LOCK_TABLE_NAME}"
+          } >> "$GITHUB_STEP_SUMMARY"

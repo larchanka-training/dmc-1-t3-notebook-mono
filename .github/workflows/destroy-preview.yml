@@ -1,0 +1,69 @@
+name: Destroy Preview
+
+on:
+  pull_request:
+    types:
+      - closed
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to destroy
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-north-1
+  ECR_REGISTRY: 867633231218.dkr.ecr.eu-north-1.amazonaws.com
+  PREVIEW_DATABASE_URL_SECRET_ARN: REPLACE_WITH_PREVIEW_DATABASE_URL_SECRET_ARN
+  TF_STATE_BUCKET: dmc-1-t3-notebook-terraform-state
+  TF_LOCK_TABLE: dmc-1-t3-notebook-terraform-lock
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  destroy-preview:
+    runs-on: ubuntu-latest
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform destroy preview root
+        run: |
+          terraform -chdir=infra/env/preview init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=t3/dmc-1-t3-notebook-mono/previews/pr-${PR_NUMBER}/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
+          terraform -chdir=infra/env/preview destroy -auto-approve \
+            -var "pr_number=${PR_NUMBER}" \
+            -var "ui_image=${ECR_REGISTRY}/t3-notebook-ui:pr-${PR_NUMBER}-latest" \
+            -var "api_image=${ECR_REGISTRY}/t3-notebook-api:pr-${PR_NUMBER}-latest" \
+            -var "database_url_secret_arn=${PREVIEW_DATABASE_URL_SECRET_ARN}" \
+            -var "deploy_nonce=destroy-${GITHUB_RUN_ID}"
+
+      - name: Write summary
+        run: |
+          {
+            echo "## Preview destroyed"
+            echo ""
+            echo "- PR: ${PR_NUMBER}"
+          } >> "$GITHUB_STEP_SUMMARY"
