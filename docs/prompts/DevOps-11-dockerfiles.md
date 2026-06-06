@@ -15,7 +15,7 @@ task:
   1. check `docker-compose.yaml` file, create missing docker files
   2. ensure `bash` installed for api and ui docker images
   3. ensure `api` and `ui` projects use `.env` file to read parameters from
-  4. ensure `api` and `ui` projects use bindMound 
+  4. ensure `api` and `ui` projects use bind mount
   5. ensure to create default configuration for `alembic` in `api` project
   6. ensure to check `api` project to there will not be `CORS policy` error when making API calls
   7. change ports for `proxy` project from 80 and 443 to 8080 and 8443
@@ -24,32 +24,17 @@ constrains:
   - do not touch `.env.example` file - that is only abstract example.
   - if only possible keep `start-services.sh` script as-is
   - minimize changes to `docker-compose.yaml` file, if it use `sh` - keep it
-  - do not change `fastapi` CLI with `unicorn`
+  - do not replace `fastapi` CLI with `uvicorn`
   - check if `fastapi` CLI is available and add required dependencies if required
   - ensure `npm` also install optional dependencies 
-  - ensure to fix moundBind for `ui` container to avoid overriding `node_modules` folder inside container with `node_modules` in `ui` app on host
 ```
-
-
-### Fix 1
-
-This problem was discovered on 1st pull request for code change:
-`node_modules` folder on host overrides the same folder in container, as result - there might be conflicts and failures.
-
-So, prompt to fix it:
-```
-role: DevOps engineer
-task: need to fix moundBind for `ui` container to avoid overriding `node_modules` folder inside container with `node_modules` in `ui` app on host
-```
-
-This fix-prompt already included into `constraints` section in main prompt.
 
 
 
 ## When success
 
 If all was ok, then there will be following services available:
-- http://localhost:5050 - pgAgmin
+- http://localhost:5050 - pgAdmin
 - http://localhost:8000 - backend
 - http://localhost:3000 - frontend
 - postgreSQL on port 5432 
@@ -127,13 +112,13 @@ Existing `start-services.sh` script use bash but bash is not part of slim/alpine
 So, need to replace with `sh` or install `bash` explicitly.
 
 It tells - bash is not installed by default for slim/alpine images.
-Added `RUN apk update && apk add bash openssl` to ui/dockerfile
-Modified `RUN apt-get update && apt-get install -y --no-install-recommends bash && rm -rf /var/lib/apt/lists/*` 
+Added `RUN apk add --no-cache bash procps-ng` to `ui/Dockerfile`
+Modified `RUN apt-get update && apt-get install -y --no-install-recommends bash procps && rm -rf /var/lib/apt/lists/*`
 in `api/dockerfile`
 
 Then need to explicitly rebuild both containers:
 ```
-docker-compose build api frontend
+docker compose build api frontend
 ```
 
 
@@ -164,7 +149,7 @@ Then run `docker compose up -d --build --force-recreate` to force rebuild all.
 Then can run `./start-services.sh` in a root of mono-repo.
 
 
-### API container start and immediately stopped
+## API container start and immediately stopped
 
 As discovered there is ref to `alembic upgrade head` in `docker-compose.yaml` file.
 API container needs a alembic lib with some basic config to be able to start with such compose configuration.
@@ -174,25 +159,25 @@ Asked AI to add dependency and prepare minimal/default config `alembic`.
 Now it starts... but still some problems - there is API call failure.
 
 
-### API call failure: {url} has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+## API call failure: {url} has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 
 ```
 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 ```
 
-Asked AI to help - it modified 
+Asked AI to help. The API should expose CORS headers for the frontend origin configured in local development.
 
 
-### Error response from daemon: error while creating mount source path '/run/desktop/mnt/host/w/larchanka/dmc-1-t3-notebook-mono/api': mkdir /run/desktop/mnt/host/w: file exists
+## Error response from daemon: error while creating mount source path '/run/desktop/mnt/host/w/larchanka/dmc-1-t3-notebook-mono/api': mkdir /run/desktop/mnt/host/w: file exists
 
-It tells that when moundBind is used then running project on drive W: may make it fail.
+It tells that when bind mount is used then running project on drive W: may make it fail.
 It recommends to move it drive C:, restart Docker Desktop, run `wsl --shutdown`.
 Then rebuild compose - `docker compose up -d --build`
 
 Ok. Moved to `C:\sbx\edu\dmc-1-t3-notebook-mono`... seems now it works.
 
 
-### `api` container fail to start.
+## `api` container fail to start.
 
 There was error in log - kind of "missing fastapi command, please use fastapi[standard] in requirements.txt".
 Fixed.
@@ -210,58 +195,24 @@ api-1  | RuntimeError: To use the fastapi command, please install "fastapi[stand
 ```
 
 
-### Error: frontend container fail to start
+## Error: frontend container fail to start
 ```
 Error: Cannot find module @rollup/rollup-linux-x64-musl. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
 frontend-1  |     at requireWithFriendlyError (/home/app/node_modules/rollup/dist/native.js:115:9)
 ```
 
-AI tells that failure was because of missing optional updated during npm install.
-Suggested to fix `dockerfile` and `docker-compose.yaml`:
+The historical failure was caused by missing optional dependencies during `npm install`.
+The current configuration keeps `npm install --include=optional` in both `ui/Dockerfile` and `docker-compose.yaml`:
 ```
-RUN npm ci --include=optional
-sh -c "cd /home/app && npm ci --include=optional && npm run dev"
-```
-
-### Error: failed to solve: invalid file request node_modules/.bin/acorn
-```
- - Image dmc-1-t3-notebook-mono-api      Building                                                       11.1s
-target frontend: failed to solve: invalid file request node_modules/.bin/acorn
+RUN npm install --include=optional
+sh -c "cd /home/app && npm install --include=optional && npm run dev"
 ```
 
-Seems local build files appears in docker image.
-As discovered - there is no `.dockerignore` file which can filter that out.
-So, need to create `.dockerignore` file with minimal content like this:
-```
-node_modules
-dist
-.git
-```
-And then do:
-```
-docker compose build --no-cache frontend
-docker compose up -d
-```
-
-
-### Error: dopcker container for ui fail to start: errors in `node_modules`
-
-As discovered docker *bindMount* feature mounting whole application folder with `node_modules` inside.
-So, `node_modules` on host overrides `node_modules` inside container. 
-That cause problems in runtime.
-
-AI tells - there is special technique for this - need to explicitly mount `/home/app/node_modules` inside a container.
-So, need a small change in `docker-compose.yaml` file.
-
+Note: a later frontend startup issue was caused by a syntax error in `ui/vite.config.ts`, not by Docker.
 
 
 
 # How-To
-
-## Initial docker build
-
-`docker-compose up -d`
-
 
 ## how to delete all which was created from docker-compose.yaml ?
 

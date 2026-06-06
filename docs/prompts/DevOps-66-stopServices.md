@@ -20,3 +20,5 @@ constraints:
   By *remove container* I mean *down container, remove it and remove its image*.
   For *removing all project docker containers* use `docker compose down -v --rmi all`
 ```
+
+test 1 - 20260518,1357

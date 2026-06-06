@@ -36,20 +36,22 @@ Use this skill when:
 - Fixing frontend bugs
 - Improving accessibility, responsiveness, loading states, or error states
 
-## First Step: Discover the Frontend Stack
+## Project Stack (Do Not Deviate)
 
-Before writing code, inspect the project for:
-
-- Framework: React, Vue, Angular, Svelte, Next.js, Nuxt, plain HTML, or other
-- Language: TypeScript, JavaScript, or other
-- Styling: CSS modules, Tailwind, Sass, styled-components, design tokens, component library
-- Routing: file-based routing, router package, custom routing
-- State management: local state, context, Redux, Zustand, Pinia, React Query, SWR, Apollo, etc.
-- Form handling: native forms, React Hook Form, Formik, Zod, Yup, custom validation
-- Testing: unit, component, integration, E2E
-- Existing component patterns and folder structure
-
-Do not introduce a new frontend dependency unless the existing stack cannot reasonably solve the problem.
+- **Framework**: React 18 + TypeScript 5.6
+- **Build**: Vite 8 (path alias `@/*` → `./src/*`)
+- **State**: Zustand 5 (slice composition pattern, singleton store, no Provider needed)
+- **Server state**: TanStack React Query 5 (staleTime: 30s, retry: 1)
+- **Routing**: React Router v7 (`createBrowserRouter`, CSR)
+- **UI**: shadcn/ui components (Radix + Tailwind), design tokens
+- **Validation**: Zod 4
+- **Editor**: CodeMirror 6 via `@uiw/react-codemirror` wrapper
+- **Persistence**: Dexie 4 (IndexedDB)
+- **Charts**: Recharts
+- **Icons**: lucide-react
+- **Testing**: Vitest 4 + Testing Library + MSW 2 (mock service worker)
+- **E2E**: Playwright 1.54
+- **Package manager**: pnpm
 
 ## Core Principles
 
@@ -123,20 +125,82 @@ Implement layouts that work across relevant viewport sizes. At minimum, check:
 
 Do not assume fixed desktop-only layouts unless the product explicitly requires them.
 
-### 7. Avoid Generic AI UI
+### 7. UI Implementation Rules
 
-Do not default to:
+- Use existing shadcn/ui components from `shared/ui/` before creating custom ones
+- Follow project design tokens (see `docs/design_tokens.md`)
+- Use `cn()` utility from `@/shared/lib/utils` for conditional Tailwind classes
+- Do not introduce new CSS frameworks, component libraries, or icon sets
+- Do not use inline styles
 
-- Purple/indigo gradients
-- Excessive rounded corners
-- Oversized cards
-- Generic hero sections
-- Stock dashboard grids
-- Placeholder copy that hides real layout constraints
-- Arbitrary shadows
-- Decorative UI unrelated to the task
+## Feature-Sliced Design (FSD) Rules
 
-Use the project's design language.
+Architecture layers (strict import direction, enforced by steiger linter):
+
+```
+app → pages → features → entities → shared
+```
+
+**Import rules:**
+- A layer may only import from layers to its RIGHT
+- `features/` CANNOT import from `pages/` or `app/`
+- `entities/` CANNOT import from `features/`, `pages/`, or `app/`
+- `shared/` CANNOT import from any other layer
+- Cross-feature imports are FORBIDDEN (use shared or entities)
+
+**Segment structure within each layer:**
+```
+<layer>/<slice>/
+├── index.ts          # Public API (ONLY export from here)
+├── model/            # State, types, hooks
+├── ui/               # Components
+├── api/              # API calls (React Query hooks, MSW handlers)
+└── lib/              # Utilities specific to this slice
+```
+
+**Public API rule:** Other layers import ONLY from `<slice>/index.ts`, never from internal segments.
+
+## Zustand 5 Slice Pattern
+
+Create slices using `StateCreator`:
+
+```typescript
+import type { StateCreator } from "zustand";
+import type { MySlice } from "./types";
+
+export const createMySlice: StateCreator<MySlice, [], [], MySlice> = (set) => ({
+  myState: initialValue,
+  myAction: (payload) => set((s) => ({ myState: /* transform */ })),
+});
+```
+
+- Register new slices in `app/model/store.ts`
+- Export slice interface type in `<feature>/model/types.ts`
+- For persisted state, add fields to `app/model/persist.ts` whitelist
+- Zustand store is a singleton — no React Provider needed
+- In tests, store resets automatically via `afterEach` hook in `test/setup.ts`
+
+## Testing Pattern (Vitest + MSW 2)
+
+```typescript
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { render, screen } from "@testing-library/react";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+
+const server = setupServer(
+  http.get("/api/v1/resource", () => HttpResponse.json({ data: [] }))
+);
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+```
+
+- Place MSW handlers near the feature: `features/<name>/api/__mocks__/handlers.ts`
+- Use `renderWithProviders()` test helper if it exists, or wrap with QueryClientProvider
+- Store resets automatically — do NOT manually reset Zustand in tests
+- localStorage clears automatically after each test
 
 ## API Integration
 

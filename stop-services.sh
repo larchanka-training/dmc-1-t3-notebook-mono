@@ -1,8 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-mode="${1:-}"
-mode="${mode,,}"
+mode=$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')
 
 KEEP_IMAGES=("postgres:16" "dpage/pgadmin4")
 
