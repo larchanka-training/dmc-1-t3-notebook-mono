@@ -44,7 +44,7 @@ Options:
 1. Raw provider text
 2. Normalized validated code string
 3. A new durable `ai` notebook block
-4. Metadata plus code proposal for insertion into a normal `code` block
+4. Metadata plus code proposal for insertion into a normal `code` block after the source `text` block
 
 ### 3. Where should the model run?
 
@@ -255,7 +255,8 @@ Assessment:
 
 Description:
 
-- normal `code` block remains canonical content
+- source `text` block remains canonical notebook documentation and AI specification
+- generated `code` block remains canonical executable content
 - optional future metadata may store last prompt/provider information
 
 Pros:
@@ -278,9 +279,9 @@ The current architecture is easiest to defend if the team accepts this package:
 1. Provider access is `backend-first`.
 2. `WebLLM` is optional local mode and retry path, not the main production path.
 3. Backend returns normalized validated code, not raw provider text.
-4. AI remains block-scoped and inserts into normal `code` blocks.
+4. AI uses an existing `text` block as the prompt source and inserts generated code into a normal `code` block placed after that `text` block.
 5. Backend performs prompt screening, code extraction, syntax validation, and bounded repair retry.
-6. `Prompt Cell` stays transient in Version 1.
+6. Version 1 does not require a user-facing durable or pseudo-durable AI prompt block; any transient UI state stays implementation-only.
 7. Optional AI provenance metadata is future scope, not baseline.
 
 ## Why This Direction Was Chosen
@@ -289,6 +290,7 @@ This direction is preferred because it:
 
 - best matches the sprint requirement around Bedrock and backend privacy
 - keeps notebook schema simple
+- uses notebook documentation itself as the generation specification
 - gives frontend a clean contract
 - contains security-sensitive logic on backend
 - supports later local mode without making local mode the main architecture
@@ -313,3 +315,4 @@ The design work should produce:
 - What exactly counts as an empty `code` block for insertion?
 - Should Version 1 support pasted text only, or also CSV/file import?
 - Should any AI provenance metadata be stored in block `meta` later?
+- Should Version 1 support only implicit context from the source `text` block by default, or also a lightweight `scope:` directive such as `scope: this` and `scope: notebook`?

@@ -232,14 +232,14 @@ The email delivery service is responsible for:
 
 ### 8.5 AI-Assisted Block Update
 
-1. The user selects a target code block or creates a new target block.
-2. The user writes an AI request.
+1. The user writes an AI request in a `text` block.
+2. For revision of an existing `code` block in Version 1, the frontend may first convert that `code` block into a `text` block that preserves the previous code and accepts revision instructions.
 3. The frontend sends the request and relevant notebook context to the backend AI endpoint.
 4. The backend requests code generation from the LLM integration.
 5. The generated code is returned to the frontend.
-6. The frontend inserts the generated code into the selected block as a proposed update.
-7. The user confirms, edits, or replaces the inserted code.
-8. The resulting block remains a normal editable notebook block.
+6. The frontend inserts the generated code into the next empty `code` block after the source `text` block, or creates a new `code` block there.
+7. The user reviews and edits the generated code.
+8. The previous code may remain visible in the source `text` block for documentation and comparison, while the new result remains a normal editable notebook block.
 
 ### 8.6 Authenticate User with Email OTP
 

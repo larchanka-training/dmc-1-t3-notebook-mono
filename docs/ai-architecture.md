@@ -7,7 +7,8 @@ This document defines the Version 1 AI generation pipeline for the notebook plat
 It fixes:
 
 - the block-scoped AI interaction model
-- the `Prompt Cell` schema and ownership model
+- the `text`-to-`code` AI generation model
+- the transient frontend AI state model
 - the canonical AI service API contract
 - the primary `AWS Bedrock` integration path
 - the optional `WebLLM` fallback path
@@ -25,8 +26,8 @@ This document extends the system architecture and must remain consistent with:
 
 The following AI decisions are fixed for Version 1:
 
-1. AI is block-scoped and operates in the context of a selected code block.
-2. Version 1 generates or refines `JavaScript` code only.
+1. AI is block-scoped and, by default, uses an existing `text` block as the source specification for generation.
+2. Version 1 generates or revises `JavaScript` code only.
 3. The canonical AI path is `frontend -> backend API -> Bedrock`.
 4. AI-generated code is untrusted and must be treated as proposed editable content.
 5. Deterministic validation is preferred over LLM-based validation where deterministic checks are sufficient.
@@ -41,8 +42,10 @@ The following AI decisions are fixed for Version 1:
 
 The AI pipeline should allow a user to:
 
-- write a request for code generation or code refinement
-- generate `JavaScript` code for a selected notebook code block
+- write notebook documentation or task description in a `text` block
+- generate `JavaScript` code from that existing notebook description
+- insert the generated code into the next empty `code` block or into a newly created `code` block after the source `text` block
+- revise an existing `code` block through an explicit conversion of that block into a `text` block that preserves the previous code and becomes the new AI source block
 - use relevant notebook context without sending the entire notebook by default
 - receive code that is ready for insertion into the notebook editor
 - recover gracefully from provider errors, invalid responses, and temporary unavailability
@@ -58,10 +61,10 @@ The AI pipeline should not:
 
 The canonical flow is:
 
-1. The user opens the AI action for a selected code block.
-2. The frontend creates or restores the transient `Prompt Cell` state for that block.
-3. The user enters a code-oriented prompt.
-4. The frontend builds the minimal relevant notebook context.
+1. The user writes or edits the task description in a `text` block.
+2. The user opens the AI action for that `text` block.
+3. The frontend derives the AI request from the `text` block content, reads any optional `scope:` directive, and creates or restores any transient UI state for that block.
+4. The frontend builds the notebook context automatically according to the deterministic context-builder rules.
 5. The frontend selects the provider path.
 6. By default, the frontend uses the canonical backend path and sends the request to `POST /api/v1/ai/code-blocks/generate`.
 7. The backend validates the request, access rights, and prompt policy.
@@ -72,14 +75,25 @@ The canonical flow is:
 12. If extraction or syntax validation fails, the backend runs a bounded repair retry using the validation error as feedback.
 13. The backend returns a normalized AI result or normalized failure.
 14. If the backend path fails with a retryable error and local mode is enabled, the frontend may offer explicit local generation through `WebLLM`.
-15. The frontend inserts the generated code into the next empty code block or a newly created code block, according to the notebook insertion rules.
+15. The frontend inserts the generated code into the next empty `code` block after the source `text` block, or creates a new `code` block there according to the notebook insertion rules.
 16. The user reviews and edits the generated code as normal notebook content.
+
+### 4.1 Revising Existing Code In Version 1
+
+Version 1 may use a deliberate simplification for revising an existing `code` block:
+
+1. The user triggers an explicit action such as `Convert code to text for AI revision`.
+2. The frontend converts the current `code` block into a `text` block.
+3. The converted `text` block preserves the previous code and may be extended with revision instructions.
+4. That converted `text` block becomes the source block for a normal AI generation request.
+5. The AI returns a new `code` block below the converted `text` block.
+6. The previous code remains visible as text for comparison and documentation, while the new code remains executable.
 
 Provider selection at a glance:
 
 ```mermaid
 flowchart TD
-    U["User prompt"] --> F["Frontend notebook UI"]
+    U["Source text block"] --> F["Frontend notebook UI"]
     F --> P{"Provider path"}
     P -->|"Default"| API["POST /api/v1/ai/code-blocks/generate"]
     API --> B["Backend AI service"]
@@ -92,13 +106,15 @@ flowchart TD
     R --> I["Insert into code block"]
 ```
 
-## 5. Prompt Cell Model
+## 5. Source Text Block And Transient AI State
 
 ### 5.1 Role
 
-The `Prompt Cell` is the user-facing AI request surface bound to a selected code block.
+The source `text` block is the canonical user-facing AI specification surface in Version 1.
 
-In Version 1, the `Prompt Cell` is a frontend-side transient UI entity.
+The user should not need to create a special AI block type or a separate durable prompt artifact.
+
+The frontend may keep transient AI state for the source block, but that state is an implementation detail rather than a product-level notebook concept.
 
 It is not:
 
@@ -121,20 +137,20 @@ An `ai` block would add new durable content semantics without a clear Version 1 
 - whether it is executable
 - whether it stores prompt history or generated outputs durably
 
-The current product goal is AI-assisted code generation around `code` blocks, not AI-first notebook authoring as a separate content type.
+The current product goal is AI-assisted code generation from notebook documentation into `code` blocks, not AI-first notebook authoring as a separate content type.
 
-For that reason, Version 1 keeps AI as a capability around a code block instead of promoting it to a new notebook block type.
+For that reason, Version 1 keeps AI as a capability around existing notebook blocks instead of promoting it to a new notebook block type.
 
-### 5.3 Prompt Cell Schema
+### 5.3 Optional Transient Frontend State
 
 Recommended frontend transient shape:
 
 ```json
 {
   "id": "ai_cell_123",
-  "targetBlockId": "blk_code_2",
+  "sourceBlockId": "blk_text_2",
   "mode": "generate",
-  "prompt": "Write JavaScript code that parses this CSV and calculates yearly totals.",
+  "derivedPrompt": "Write JavaScript code that parses this CSV and calculates yearly totals.",
   "status": "idle",
   "lastRequestId": null,
   "lastResponseCode": null,
@@ -144,14 +160,14 @@ Recommended frontend transient shape:
 }
 ```
 
-### 5.4 Prompt Cell Fields
+### 5.4 Transient State Fields
 
 | Field | Meaning |
 |---|---|
-| `id` | Client-side identity of the prompt UI state |
-| `targetBlockId` | The code block for which generation or refinement is requested |
-| `mode` | `generate` for new code or `refine` for updating existing code |
-| `prompt` | User instruction intended to produce code |
+| `id` | Client-side identity of the transient AI UI state |
+| `sourceBlockId` | The `text` block that acts as the source specification |
+| `mode` | `generate` for a new code result or `revise` for code revision through the text-conversion flow |
+| `derivedPrompt` | Prompt text derived from the source block and UI options |
 | `status` | `idle`, `submitting`, `success`, or `error` |
 | `lastRequestId` | Last backend AI request id, if present |
 | `lastResponseCode` | Last returned code proposal, not durable by default |
@@ -163,18 +179,74 @@ Recommended frontend transient shape:
 
 The frontend context builder should send only the information required for the current AI task.
 
-### 6.1 Included Context
+The user does not manually assemble context in Version 1.
+
+The product behavior is:
+
+- the user writes the task description in the source `text` block
+- the user may optionally add a `scope:` directive inside that same `text` block
+- the frontend derives the prompt and context automatically
+- if the request starts from an existing `code` block, the frontend must first convert that block into a `text` source block for revision
+
+### 6.1 Default Behavior
+
+If no `scope:` directive is present, Version 1 should behave as if the source block contains `scope: this`.
+
+This keeps the default behavior simple, local, and predictable.
+
+### 6.2 Deterministic Context Assembly
+
+Recommended Version 1 algorithm:
+
+1. Start with the source `text` block.
+2. Remove any recognized leading `scope:` directive from the prompt text before sending it to the model.
+3. Determine the insertion target:
+   - use the next block if it is an empty `code` block
+   - otherwise create a new `code` block immediately after the source `text` block
+4. Always include:
+   - source `text` block id
+   - normalized source text content
+   - notebook title, when present
+   - insertion strategy
+5. If execution-session globals are available and safely serializable, include a compact globals summary.
+6. If `scope: this` applies:
+   - do not include the full notebook
+   - include only the source `text` block as the canonical prompt source
+   - optionally include the nearest preceding `code` block when it is directly relevant to reused variables or helper functions
+7. If `scope: notebook` applies:
+   - include notebook blocks from the start of the notebook up to and including the source `text` block
+   - preserve notebook order
+   - exclude blocks after the source block
+8. If the selected context exceeds the request budget:
+   - preserve the source `text` block
+   - preserve insertion metadata
+   - preserve globals summary when present
+   - then drop the farthest low-priority blocks first
+
+### 6.3 Included Context
 
 Recommended context inputs:
 
-- selected code block id
-- selected block current source
+- source `text` block id
+- source block content
+- insertion target preview when already known
 - nearby relevant text blocks when they define the task
 - nearby relevant code blocks when they define reusable values or functions
 - known global variables available in the current execution session, when safely representable
 - notebook title when useful as lightweight context
 
-### 6.2 Excluded Context
+### 6.4 Optional Scope Directive
+
+Version 1 may support a lightweight `scope:` directive inside the source `text` block to influence context selection.
+
+Recommended low-complexity options:
+
+- `scope: this` means use only this `text` block as the primary prompt source
+- `scope: notebook` means the builder may use the broader notebook as context
+
+Named references such as `scope: name1, name2` should be treated as future scope unless a user-facing block addressing model is specified elsewhere, including naming and reference-resolution rules.
+
+### 6.5 Excluded Context
 
 The context builder should not include by default:
 
@@ -184,7 +256,7 @@ The context builder should not include by default:
 - large execution outputs unless directly required for the request
 - hidden internal application metadata
 
-### 6.3 Context Reduction Principle
+### 6.6 Context Reduction Principle
 
 The context builder should prefer:
 
@@ -211,12 +283,13 @@ Recommended request shape:
 ```json
 {
   "notebookId": "nb_123",
-  "targetBlockId": "blk_code_2",
+  "sourceBlockId": "blk_text_2",
   "mode": "generate",
   "prompt": "Write JavaScript code that parses this CSV and calculates yearly totals.",
   "context": {
     "language": "javascript",
-    "currentSource": "",
+    "scope": "this",
+    "sourceText": "Parse this CSV and calculate yearly totals.",
     "globals": ["csvText", "headers"],
     "relevantBlocks": [
       {
@@ -229,7 +302,10 @@ Recommended request shape:
         "type": "code",
         "source": "const headers = ['year', 'amount'];"
       }
-    ]
+    ],
+    "insertion": {
+      "strategy": "next-empty-or-new-after-source"
+    }
   }
 }
 ```
@@ -238,9 +314,11 @@ Recommended request shape:
 
 Request rules:
 
-- `targetBlockId` must refer to a notebook `code` block
-- `mode` must be `generate` or `refine`
+- `sourceBlockId` must refer to a notebook `text` block
+- `mode` must be `generate` or `revise`
 - `prompt` must be non-empty
+- if `context.scope` is omitted, the frontend should treat it as `this`
+- `context.scope` may be `this` or `notebook` in Version 1
 - `context.language` must be `javascript` in Version 1
 - notebook ownership and authenticated access are enforced on the backend
 - prompt-injection screening is enforced on the backend before the provider call
@@ -284,7 +362,7 @@ The product-side AI endpoint is for code generation only.
 
 Prompt policy rules:
 
-- the prompt must ask for code generation or code refinement
+- the prompt must ask for code generation or code revision
 - non-code requests should be rejected
 - the backend is the final enforcement point for prompt policy
 - the frontend may add lightweight user guidance before submission, but frontend checks are not the trust boundary
@@ -578,7 +656,14 @@ Security rules:
 
 One acceptable future extension is lightweight AI provenance metadata on a `code` block.
 
-This is not part of the Version 1 baseline. Version 1 keeps `Prompt Cell` state transient by default.
+This is not part of the Version 1 baseline. Version 1 keeps any AI-specific UI state transient by default.
+
+Another acceptable future extension is a more direct dual AI interaction model:
+
+- `Generate code` from a `text` block
+- `Refine code` directly from an existing `code` block without converting it to `text` first
+
+This is not part of the Version 1 baseline. Version 1 uses the simpler text-source flow for both new generation and code revision.
 
 A later version may choose to store only the most recent AI generation metadata in block `meta`, for example:
 
@@ -617,7 +702,7 @@ Constraints for such an extension:
 
 The following questions remain product and implementation decisions:
 
-1. Should prompt history remain transient or be stored later in block metadata?
+1. Should prompt history remain transient or be stored later in generated `code` block metadata?
 2. Should `WebLLM` be enabled in production only as explicit local mode, or also as a retry option after backend failure?
 3. Should explicit local mode be user-configurable through a setting such as `useLocalAI: true`, or only through environment flags?
 4. How many nearby blocks should the context builder include by default?
@@ -627,6 +712,7 @@ The following questions remain product and implementation decisions:
 8. What is the exact maximum number of repair attempts that keeps latency acceptable in production?
 9. What is the exact canonical definition of an empty `code` block for insertion logic and tests?
 10. Should Version 1 support CSV or other file import into notebook workflow, or keep the scope limited to pasted text content only?
+11. Should Version 1 support only implicit source-block context, or also the lightweight `scope:` directive with values like `this` and `notebook`?
 
 ## 16. Summary
 
@@ -634,7 +720,8 @@ Version 1 AI architecture keeps the notebook model simple:
 
 - notebook durable blocks remain `text` and `code`
 - AI stays block-scoped
-- `Prompt Cell` is transient frontend state
+- the source `text` block acts as the canonical AI specification
+- any AI-specific frontend state is transient
 - `Bedrock` is the primary provider path through the backend
 - `WebLLM` is an optional local path, not the canonical default
 - prompt-injection screening is enforced on the backend
