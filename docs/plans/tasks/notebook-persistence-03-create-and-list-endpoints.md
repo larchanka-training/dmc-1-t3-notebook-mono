@@ -41,12 +41,12 @@
 - все notebook endpoints требуют authenticated session cookie
 - anonymous request должен получать `401 Unauthorized`
 - create/list behavior должен использовать repository/service layer, а не прямой DB access в router
-- initial notebook snapshot должен соответствовать Version 1 notebook schema
+- initial notebook snapshot должен соответствовать Version 1 notebook schema и включать `tags: []`
 
 ## Acceptance criteria
 
 - [ ] `POST /api/v1/notebooks` создаёт notebook текущего пользователя и возвращает contract-stable notebook response
-- [ ] Новый notebook стартует с `revision = 1` и canonical initial `content_snapshot`
+- [ ] Новый notebook стартует с `revision = 1`, canonical initial `content_snapshot` и пустым notebook-level `tags`
 - [ ] `GET /api/v1/notebooks` возвращает только notebook summaries текущего пользователя
 - [ ] Anonymous requests к create/list endpoints получают `401 Unauthorized`
 - [ ] Integration coverage подтверждает, что notebooks разных users не смешиваются в list response
@@ -71,7 +71,7 @@
 ## Риски / заметки
 
 - если list ordering не будет явно зафиксирован сейчас, frontend tests позже могут зацементировать случайное поведение
-- initial snapshot не должен включать runtime placeholders или local-only metadata
+- initial snapshot не должен включать runtime placeholders или local-only metadata и не должен пропускать обязательное поле `tags`
 
 ## Completion update
 

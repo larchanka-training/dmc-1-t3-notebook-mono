@@ -21,6 +21,7 @@
 - проверить и при необходимости доработать semantics для `revision`, `updated_at`, `created_at`, `last_synced_at`
 - привести CRUD responses к sync-ready shape, ожидаемой следующими notebook stages
 - задокументировать service/repository invariants, от которых позже будет зависеть `/sync`
+- зафиксировать, что sync-ready snapshot shape уже включает notebook-level `tags` и block-level `meta.tags`
 - убедиться, что durable notebook records не включают runtime-only state
 
 ## Out of scope
@@ -35,11 +36,12 @@
 - newly created notebook должен оставаться с `revision = 1`
 - CRUD update paths не должны случайно эмулировать sync behavior через `base_revision`
 - `last_synced_at` не должен получать misleading semantics до реального sync endpoint
+- later `/sync` не должен требовать отдельную tag-specific форму вне canonical snapshot
 
 ## Acceptance criteria
 
 - [ ] Создание и metadata update notebook сохраняют стабильные revision/timestamp semantics, совместимые с `api/docs/persistence.md`
-- [ ] CRUD responses содержат поля, на которые later sync direction сможет опереться без изменения storage contract
+- [ ] CRUD responses содержат поля, на которые later sync direction сможет опереться без изменения storage contract, включая notebook-level `tags` и block-level `meta.tags`
 - [ ] Durable notebook records не включают runtime outputs или execution session state
 - [ ] В коде и документации зафиксированы invariants, достаточные для добавления `/sync` отдельной задачей
 

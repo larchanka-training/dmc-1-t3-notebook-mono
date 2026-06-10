@@ -23,7 +23,7 @@
 - добавить request/response DTOs для notebook summary, full notebook, create payload и metadata patch payload
 - реализовать validation rules для `content_snapshot`
 - ограничить block types до `text` и `code`
-- зафиксировать правила для `blocks` order, `metadata.version`, `content_snapshot.id` и `content_snapshot.title`
+- зафиксировать правила для `blocks` order, `metadata.version`, `content_snapshot.id`, `content_snapshot.title`, `content_snapshot.tags` и `block.meta.tags`
 - исключить runtime outputs и execution session state из durable snapshot contract
 - добавить service-level helpers для согласования notebook row metadata и `content_snapshot`
 
@@ -38,6 +38,7 @@
 
 - notebook format должен оставаться structured `JSON`
 - durable snapshot не должен включать `text`, `object`, `table`, `chart`, `error` outputs как stored notebook state
+- validation должна требовать notebook-level `tags` и `meta.tags` у каждого блока независимо от его типа
 - validation rules должны быть пригодны и для create, и для later sync flows
 - API contract остаётся under `/api/v1`
 
@@ -45,9 +46,10 @@
 
 - [ ] В кодовой базе существуют DTO/schema модели для notebook summary, full notebook, create payload и patch payload
 - [ ] Validation отвергает notebook snapshots с неподдерживаемыми block types или malformed content shape
+- [ ] Validation требует `content_snapshot.tags` как список строк и `block.meta.tags` как список строк для каждого блока
 - [ ] Runtime outputs и execution session data не проходят как часть durable `content_snapshot`
 - [ ] Правила согласования `title`/`id` между notebook row и snapshot определены и переиспользуемы в service layer
-- [ ] Integration tests покрывают минимум valid snapshot и несколько invalid payload paths
+- [ ] Integration tests покрывают минимум valid snapshot и invalid payload paths для missing tags, non-array tags и non-string tag values
 
 ## Verification
 
