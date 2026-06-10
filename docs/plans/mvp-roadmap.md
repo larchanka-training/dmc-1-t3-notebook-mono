@@ -40,14 +40,19 @@ Based on the current repository state:
 
 - documentation and architecture are ahead of implementation
 - frontend shell and mock editor foundation already exist
-- backend product features are still mostly skeletal
-- auth, notebook persistence, runtime execution, sync, and AI are not yet complete end-to-end product capabilities
+- backend `Email + OTP` auth and session flows are implemented and covered by integration tests
+- Google OAuth, notebook persistence backend, sync, AI, and real execution runtime are still incomplete as end-to-end product capabilities
+- notebook backend and AI backend feature modules are still skeletal
 
 This roadmap therefore starts from the current partial foundation, not from zero.
 
 ## Stages
 
 ### Stage 0. Foundation and Planning Baseline
+
+**Status**
+
+`mostly done`
 
 **Goal**
 
@@ -71,6 +76,10 @@ Stabilize the canonical docs, local environment, implementation conventions, and
 - all later stages depend on this baseline
 
 ### Stage 1. Frontend Application Shell and Notebook Editor Skeleton
+
+**Status**
+
+`mostly done`
 
 **Goal**
 
@@ -96,6 +105,10 @@ Establish the real application shell and notebook editing UX in the browser, eve
 
 ### Stage 2. Authentication Backend and Real Auth Integration
 
+**Status**
+
+`in progress`
+
 **Goal**
 
 Replace mock auth with real backend-managed authentication for Version 1.
@@ -109,12 +122,14 @@ Replace mock auth with real backend-managed authentication for Version 1.
 
 **Includes**
 
-- auth persistence and session foundation
-- email OTP request flow
-- OTP verify and session issuance
-- session bootstrap and logout
-- Google OAuth flow
-- auth integration hardening
+- completed:
+  - auth persistence and session foundation
+  - email OTP request flow
+  - OTP verify and session issuance
+  - session bootstrap and logout
+  - auth integration hardening
+- remaining:
+  - Google OAuth flow
 
 **Direction plan**
 
@@ -127,6 +142,10 @@ Replace mock auth with real backend-managed authentication for Version 1.
 - realistic release validation
 
 ### Stage 3. Notebook Persistence Backend
+
+**Status**
+
+`planned`
 
 **Goal**
 
@@ -154,6 +173,10 @@ Turn notebooks into real durable backend entities with canonical snapshot storag
 
 ### Stage 4. Local-First Working Copy Persistence
 
+**Status**
+
+`planned`
+
 **Goal**
 
 Implement the browser-side persistence model required for offline-capable notebook work.
@@ -172,12 +195,20 @@ Implement the browser-side persistence model required for offline-capable notebo
 - unsynced state persistence
 - restore after reload
 
+**Current note**
+
+The repository already has persistence-related ADRs and auth state persistence in the frontend, but notebook working-copy persistence via `IndexedDB/Dexie` is not implemented yet.
+
 **Blocks**
 
 - complete sync UX
 - real local-first behavior required by MVP
 
 ### Stage 5. Execution Runtime MVP
+
+**Status**
+
+`planned`
 
 **Goal**
 
@@ -206,6 +237,10 @@ Make notebooks executable in the browser with preserved `execution session` and 
 
 ### Stage 6. Manual Sync and Conflict Handling
 
+**Status**
+
+`planned`
+
 **Goal**
 
 Implement the explicit manual sync model between browser working copy and backend durable state.
@@ -231,6 +266,10 @@ Implement the explicit manual sync model between browser working copy and backen
 
 ### Stage 7. AI-Assisted Notebook Workflow
 
+**Status**
+
+`planned`
+
 **Goal**
 
 Implement the AI workflow inside the notebook editing loop, not as detached chat.
@@ -254,6 +293,10 @@ Implement the AI workflow inside the notebook editing loop, not as detached chat
 - full MVP AI capability
 
 ### Stage 8. Export, Quality, and Release Readiness
+
+**Status**
+
+`planned`
 
 **Goal**
 
@@ -310,8 +353,8 @@ flowchart TD
 |---|---|---|---|---|
 | 0 | Foundation and Planning Baseline | Stable contracts and dev baseline | None | 1 planning prep |
 | 1 | Frontend Shell and Editor Skeleton | Visible product shell | 0 | 2, 3 |
-| 2 | Authentication Backend and Real Auth Integration | Real auth flow | 0 | 1, 3 |
-| 3 | Notebook Persistence Backend | Durable notebook storage | 0 | 1, 2 |
+| 2 | Authentication Backend and Real Auth Integration | Real auth flow except Google OAuth | 0 | 1, 3 |
+| 3 | Notebook Persistence Backend | Durable notebook storage | 0, 2 | 1 |
 | 4 | Local-First Working Copy Persistence | Offline-capable working copy | 1, 3 | 5 |
 | 5 | Execution Runtime MVP | Executable notebook behavior | 1 | 4 |
 | 6 | Manual Sync and Conflict Handling | Explicit sync model | 3, 4 | 7 |
@@ -325,10 +368,10 @@ Direction plans should sit between this roadmap and task-level specs.
 Existing:
 
 - [01-auth-backend-plan.md](./01-auth-backend-plan.md)
+- [02-notebook-persistence-plan.md](./02-notebook-persistence-plan.md)
 
 Recommended next direction plans:
 
-- `docs/plans/02-notebook-persistence-plan.md`
 - `docs/plans/03-local-first-persistence-plan.md`
 - `docs/plans/04-execution-runtime-plan.md`
 - `docs/plans/05-sync-plan.md`
@@ -341,7 +384,7 @@ Use this as the default delivery order unless a narrower approved task overrides
 
 1. finish Stage 0 planning baseline where gaps still exist
 2. stabilize Stage 1 shell only as much as needed for integration
-3. complete Stage 2 auth backend
+3. close the remaining Stage 2 auth scope or explicitly defer `Google OAuth`
 4. complete Stage 3 notebook persistence backend
 5. implement Stage 4 local-first persistence
 6. implement Stage 5 runtime MVP
@@ -351,7 +394,7 @@ Use this as the default delivery order unless a narrower approved task overrides
 
 ## Checkpoints
 
-- [ ] After Stages 0-1: the product shell and planning structure are stable enough to support parallel feature work.
+- [x] After Stages 0-1: the product shell and planning structure are stable enough to support parallel feature work.
 - [ ] After Stages 2-3: the backend exposes real auth and notebook persistence boundaries.
 - [ ] After Stages 4-6: the core local-first notebook loop works with durable sync.
 - [ ] After Stage 7: AI works inside the normal notebook editing flow.
