@@ -8,7 +8,7 @@
 
 Этот документ отвечает на вопросы:
 
-- какой следующий план писать после уже существующего [01-auth-backend-plan.md](./01-auth-backend-plan.md)
+- какой следующий план писать после уже существующих direction plans
 - какие планы действительно нужны для движения к MVP
 - что должен покрывать каждый план, чтобы команда и агенты могли дальше раскладывать его в задачи
 
@@ -19,60 +19,22 @@
 - [mvp-roadmap.md](./mvp-roadmap.md)
 - [mvp-roadmapRU.md](./mvp-roadmapRU.md)
 - текущего состояния репозитория
-- уже существующего плана [01-auth-backend-plan.md](./01-auth-backend-plan.md)
+- уже существующих планов:
+  - [01-auth-backend-plan.md](./01-auth-backend-plan.md)
+  - [02-notebook-persistence-plan.md](./02-notebook-persistence-plan.md)
 
 ## Что уже есть
 
-Уже создан:
+Уже созданы:
 
 - [01-auth-backend-plan.md](./01-auth-backend-plan.md)
+- [02-notebook-persistence-plan.md](./02-notebook-persistence-plan.md)
 
 Дальше нужно последовательно добавить планы по следующим направлениям.
 
 ## Приоритетный список файлов-планов
 
-### 1. `docs/plans/02-notebook-persistence-plan.md`
-
-**Почему это следующий приоритет**
-
-После авторизации это самый важный backend-этап. Без него нельзя перейти к реальной работе со списком notebook, открытием notebook, хранением состояния и последующей синхронизацией.
-
-**Что должен дать этот план**
-
-- общее представление, как реализовать backend-хранение notebook
-- порядок шагов от модели хранения до API и integration tests
-- явные зависимости от auth
-
-**Что должно быть внутри**
-
-- Goal
-- Task Artifact
-- Assumptions
-- Architecture Notes
-- Tasks
-- Risks and Open Points
-
-**Какие темы должен покрывать**
-
-- модель хранения notebook
-- JSONB snapshot
-- notebook CRUD API
-- revision model
-- owner-only access control
-- связь notebook API с auth
-- integration coverage для notebook endpoints
-- минимальная опора для дальнейшей frontend integration
-
-**Ожидаемые этапы внутри плана**
-
-1. persistence model and migrations
-2. create/list/get notebook
-3. rename/delete notebook
-4. owner-only access control
-5. integration tests
-6. frontend contract alignment
-
-### 2. `docs/plans/03-local-first-persistence-plan.md`
+### 1. `docs/plans/03-local-first-persistence-plan.md`
 
 **Почему это следующий приоритет**
 
@@ -112,7 +74,7 @@ MVP требует local-first поведения. После backend-хране
 5. restore after reload
 6. frontend wiring and tests
 
-### 3. `docs/plans/04-execution-runtime-plan.md`
+### 2. `docs/plans/04-execution-runtime-plan.md`
 
 **Почему это высокий приоритет**
 
@@ -154,7 +116,7 @@ MVP требует local-first поведения. После backend-хране
 5. output normalization
 6. tests and failure handling
 
-### 4. `docs/plans/05-sync-plan.md`
+### 3. `docs/plans/05-sync-plan.md`
 
 **Почему это следующий приоритет**
 
@@ -194,7 +156,7 @@ MVP требует local-first поведения. После backend-хране
 5. explicit conflict UX
 6. integration and end-to-end verification
 
-### 5. `docs/plans/06-ai-integration-plan.md`
+### 4. `docs/plans/06-ai-integration-plan.md`
 
 **Почему это не нужно писать первым**
 
@@ -234,7 +196,7 @@ AI важен для MVP, но не должен планироваться ра
 5. execution after insertion
 6. tests and error handling
 
-### 6. `docs/plans/07-release-readiness-plan.md`
+### 5. `docs/plans/07-release-readiness-plan.md`
 
 **Почему он последний**
 
@@ -277,17 +239,16 @@ AI важен для MVP, но не должен планироваться ра
 
 Создавать их лучше в таком порядке:
 
-1. `02-notebook-persistence-plan.md`
-2. `03-local-first-persistence-plan.md`
-3. `04-execution-runtime-plan.md`
-4. `05-sync-plan.md`
-5. `06-ai-integration-plan.md`
-6. `07-release-readiness-plan.md`
+1. `03-local-first-persistence-plan.md`
+2. `04-execution-runtime-plan.md`
+3. `05-sync-plan.md`
+4. `06-ai-integration-plan.md`
+5. `07-release-readiness-plan.md`
 
 ## Почему именно такой порядок
 
-- `02` нужен, потому что без backend-хранения notebook дальнейшие шаги висят в воздухе.
-- `03` нужен сразу после `02`, потому что local-first — одно из главных требований MVP.
+- `02` уже создан и закрывает backend-планирование для notebook persistence.
+- `03` теперь следующий, потому что local-first — одно из главных требований MVP.
 - `04` нужен рано, потому что выполнение кода — одна из центральных возможностей продукта.
 - `05` зависит от понимания и backend-хранения, и local-first модели.
 - `06` лучше писать после фиксации опоры под notebook data flow и runtime.
@@ -309,9 +270,9 @@ AI важен для MVP, но не должен планироваться ра
 
 Следующий файл, который стоит создать прямо сейчас:
 
-- `docs/plans/02-notebook-persistence-plan.md`
+- `docs/plans/03-local-first-persistence-plan.md`
 
 После него:
 
-- `docs/plans/03-local-first-persistence-plan.md`
 - `docs/plans/04-execution-runtime-plan.md`
+- `docs/plans/05-sync-plan.md`
