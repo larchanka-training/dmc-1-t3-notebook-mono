@@ -23,6 +23,7 @@
 - вернуть full notebook snapshot для owned notebook
 - разрешить metadata update минимум для `title`
 - синхронизировать row metadata и `content_snapshot.title`, если title хранится в обоих местах
+- сохранить notebook-level `tags` и block-level `meta.tags` неизменными, если patch их не изменяет
 - вернуть `404 Not Found` для notebook, который недоступен текущему user
 
 ## Out of scope
@@ -40,17 +41,17 @@
 
 ## Acceptance criteria
 
-- [ ] `GET /api/v1/notebooks/{notebook_id}` возвращает full notebook response для owned notebook
-- [ ] `PATCH /api/v1/notebooks/{notebook_id}` обновляет поддерживаемые metadata fields без поломки snapshot consistency
+- [ ] `GET /api/v1/notebooks/{notebook_id}` возвращает full notebook response для owned notebook, включая notebook-level `tags` и block-level `meta.tags`
+- [ ] `PATCH /api/v1/notebooks/{notebook_id}` обновляет поддерживаемые metadata fields без поломки snapshot consistency и без потери существующих tag fields
 - [ ] Запрос к notebook другого пользователя или несуществующему notebook возвращает `404 Not Found`
-- [ ] Updated notebook response отражает актуальные `updated_at` и согласованный `title`
+- [ ] Updated notebook response отражает актуальные `updated_at`, согласованный `title` и сохранённые `tags`
 - [ ] Integration tests покрывают owner-only access и metadata update path
 
 ## Verification
 
 - [ ] `cd api && pytest tests/unit -q`
 - [ ] `cd api && pytest -m integration tests/integration/notebooks/test_item.py -q`
-- [ ] вручную проверить сценарий `create -> get by id -> patch title -> get by id`
+- [ ] вручную проверить сценарий `create -> get by id -> patch title -> get by id` и убедиться, что `tags` не меняются
 
 ## Dependencies
 

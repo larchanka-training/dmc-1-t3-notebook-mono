@@ -25,7 +25,7 @@
 - `requirements.md` [done]
 - `requirements.md` [done]
 - Диаграмма системы [done]
-- Работа с git
+- Работа с git [done] - `docs/guides/git-workflow.md`
 - Правила PR
 - Sprint board
 

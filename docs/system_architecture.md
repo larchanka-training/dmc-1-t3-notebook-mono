@@ -307,6 +307,7 @@ Notebook content is stored and transferred as structured `JSON`.
 The notebook model contains:
 
 - notebook identity and metadata
+- notebook-level `tags`
 - ordered blocks
 - sync-related metadata
 
@@ -319,6 +320,8 @@ Each block has:
 - block content
 - block-level metadata
 
+In Version 1, block-level metadata includes `tags`.
+
 Version 1 block types:
 
 - `text`
@@ -328,9 +331,13 @@ Version 1 block types:
 
 Text blocks store content as `Markdown`.
 
+Text blocks must also carry `meta.tags` as a list of tags.
+
 ### 10.4 Code Block Format
 
 Code blocks store content as executable `JavaScript` source.
+
+Code blocks must also carry `meta.tags` as a list of tags.
 
 ### 10.5 Runtime Output Format
 

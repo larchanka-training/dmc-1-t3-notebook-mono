@@ -307,6 +307,7 @@ Notebook-контент хранится и передается как стру
 Модель notebook содержит:
 
 - identity и metadata notebook
+- notebook-level поле `tags`
 - упорядоченные blocks
 - sync-related metadata
 
@@ -319,6 +320,8 @@ Notebook-контент хранится и передается как стру
 - block content
 - block-level metadata
 
+В Version 1 block-level metadata включает `tags`.
+
 Типы блоков в Version 1:
 
 - `text`
@@ -328,9 +331,13 @@ Notebook-контент хранится и передается как стру
 
 Text blocks хранят контент как `Markdown`.
 
+Text blocks также должны содержать `meta.tags` как список тегов.
+
 ### 10.4 Формат code block
 
 Code blocks хранят контент как исполняемый исходный код `JavaScript`.
+
+Code blocks также должны содержать `meta.tags` как список тегов.
 
 ### 10.5 Формат runtime output
 

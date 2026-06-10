@@ -23,6 +23,7 @@
 
 - добавить persistence model для notebook storage в `api/app/features/notebooks/models.py`
 - зафиксировать поля `id`, `owner_id`, `title`, `content_snapshot`, `revision`, `created_at`, `updated_at`, `last_synced_at`
+- обеспечить, что `content_snapshot` может durable хранить notebook-level `tags` и block-level `meta.tags`
 - подготовить Alembic migration(s) для notebook table и необходимых owner/revision lookup constraints
 - добавить repository primitives для create/get/list/update/delete notebook row
 - сохранить snapshot-based model на базе `JSONB`, без отдельной block graph schema
@@ -38,6 +39,7 @@
 ## Технические ограничения
 
 - durable notebook content должен оставаться одним `JSONB` snapshot per notebook
+- snapshot round-trip через repository/model не должен терять notebook-level `tags` и block-level `meta.tags`
 - ownership должен быть привязан к authenticated user из auth foundation
 - новые зависимости не добавлять без явного одобрения
 - backend structure должна остаться `feature-driven with internal layers`
@@ -46,7 +48,7 @@
 
 - [ ] В кодовой базе есть ORM/persistence model для notebook c полями, согласованными с `api/docs/persistence.md`
 - [ ] Alembic migration создаёт notebook storage без multi-table block decomposition
-- [ ] Repository layer поддерживает create/get/list/update/delete primitives для notebook entity
+- [ ] Repository layer поддерживает create/get/list/update/delete primitives для notebook entity и сохраняет `content_snapshot` без потери notebook-level `tags` и block-level `meta.tags`
 - [ ] Ownership и revision fields готовы для последующего CRUD и sync behavior
 - [ ] Базовая notebook persistence foundation не ломает существующие system health integration tests
 

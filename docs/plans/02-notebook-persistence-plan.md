@@ -26,7 +26,7 @@ Implement the Version 1 backend notebook persistence feature so authenticated us
 - Preserve the feature-driven backend structure under `api/app/features/notebooks/{router,schemas,service,repository,models}.py`.
 - Keep all notebook routes under `/api/v1/notebooks` and protect them with shared auth dependencies rather than endpoint-local cookie parsing.
 - Treat `api/docs/persistence.md` as the implementation-facing source of truth for endpoint shapes, `revision`, `last_synced_at`, and owner-only behavior.
-- Keep the server contract aligned with the frontend canonical notebook JSON shape: ordered `blocks`, allowed block types `text` and `code`, and metadata versioning.
+- Keep the server contract aligned with the frontend canonical notebook JSON shape: notebook-level `tags`, ordered `blocks`, allowed block types `text` and `code`, block-level `meta.tags`, and metadata versioning.
 - Return `404 Not Found` for notebook IDs not owned by the authenticated user, per `api/docs/persistence.md`, even if some higher-level docs still mention `403`.
 - Avoid mixing full sync behavior into early CRUD tasks unless the revision model requires a minimal shared foundation; explicit sync stays a later direction even if the persistence schema prepares for it.
 - Reuse the existing integration-test scaffolding in `api/tests/conftest.py`, including the future authenticated client/session pattern established by the auth direction.
@@ -42,7 +42,7 @@ Implement the Version 1 backend notebook persistence feature so authenticated us
 **Acceptance criteria:**
 - [ ] Persistence entities exist for notebooks with `id`, `owner_id`, `title`, `content_snapshot`, `revision`, `created_at`, `updated_at`, and nullable `last_synced_at`, consistent with `api/docs/persistence.md`.
 - [ ] The migration baseline creates notebook storage and indexes/constraints appropriate for owner-scoped lookup without introducing a separate block table graph.
-- [ ] Shared repository primitives exist for create/get/list/update/delete operations against the notebook row model.
+- [ ] Shared repository primitives exist for create/get/list/update/delete operations against the notebook row model without losing notebook-level `tags` or block-level `meta.tags` from the stored snapshot.
 
 **Verification:**
 - [ ] `cd api && pytest tests/unit -q`
@@ -65,7 +65,7 @@ Implement the Version 1 backend notebook persistence feature so authenticated us
 
 **Acceptance criteria:**
 - [ ] Request and response DTOs exist for notebook summary, full notebook, create payload, patch payload, and shared error responses.
-- [ ] Snapshot validation enforces Version 1 rules: structured JSON, ordered `blocks`, allowed block types `text` and `code`, and exclusion of durable runtime outputs by default.
+- [ ] Snapshot validation enforces Version 1 rules: structured JSON, notebook-level `tags`, ordered `blocks`, allowed block types `text` and `code`, block-level `meta.tags`, and exclusion of durable runtime outputs by default.
 - [ ] Service-level helpers keep duplicated title/id fields consistent where the contract requires notebook row metadata and `content_snapshot` metadata to align.
 
 **Verification:**
@@ -89,7 +89,7 @@ Implement the Version 1 backend notebook persistence feature so authenticated us
 **Description:** Add authenticated collection endpoints so users can create a notebook and browse only their own notebook summaries. This is the first user-visible notebook persistence slice and should unlock the real notebook list flow for the frontend.
 
 **Acceptance criteria:**
-- [ ] `POST /api/v1/notebooks` creates an owned notebook with `revision = 1` and a canonical initial `content_snapshot`.
+- [ ] `POST /api/v1/notebooks` creates an owned notebook with `revision = 1` and a canonical initial `content_snapshot` that includes `tags: []`.
 - [ ] `GET /api/v1/notebooks` returns only notebook summaries for the authenticated user with contract-aligned fields and ordering.
 - [ ] Anonymous access returns `401 Unauthorized`, and notebook ownership is enforced through shared auth dependencies rather than ad hoc checks.
 
@@ -112,8 +112,8 @@ Implement the Version 1 backend notebook persistence feature so authenticated us
 **Description:** Add item-level read and rename behavior for owned notebooks so the frontend can open a real persisted notebook and update lightweight metadata without full sync semantics.
 
 **Acceptance criteria:**
-- [ ] `GET /api/v1/notebooks/{notebook_id}` returns the full canonical notebook snapshot for an owned notebook.
-- [ ] `PATCH /api/v1/notebooks/{notebook_id}` updates supported metadata such as `title` while keeping row metadata and `content_snapshot` title alignment consistent.
+- [ ] `GET /api/v1/notebooks/{notebook_id}` returns the full canonical notebook snapshot for an owned notebook, including notebook-level `tags` and block-level `meta.tags`.
+- [ ] `PATCH /api/v1/notebooks/{notebook_id}` updates supported metadata such as `title` while keeping row metadata and `content_snapshot` title alignment consistent and without dropping existing tag data from the snapshot.
 - [ ] Requests for notebooks outside the current user's ownership return `404 Not Found` per the persistence contract.
 
 **Verification:**
@@ -161,7 +161,7 @@ Implement the Version 1 backend notebook persistence feature so authenticated us
 
 **Acceptance criteria:**
 - [ ] Notebook creation and update flows maintain stable `revision`, `updated_at`, and `last_synced_at` semantics consistent with `api/docs/persistence.md`.
-- [ ] CRUD responses expose the fields the frontend and later sync feature need, without leaking runtime-only state into durable notebook records.
+- [ ] CRUD responses expose the fields the frontend and later sync feature need, including notebook-level `tags` and block-level `meta.tags`, without leaking runtime-only state into durable notebook records.
 - [ ] Repository and service behavior are documented clearly enough that `/api/v1/notebooks/{notebook_id}/sync` can be added as a later task without changing the stored notebook shape.
 
 **Verification:**
@@ -183,9 +183,9 @@ Implement the Version 1 backend notebook persistence feature so authenticated us
 **Description:** Finish the notebook persistence direction with regression-oriented integration tests, authenticated fixtures, and documentation cleanup where current docs disagree on access semantics or persistence details.
 
 **Acceptance criteria:**
-- [ ] Integration coverage exists for anonymous access, owner-only list/open/update/delete behavior, create defaults, and notebook JSON validation failure paths.
+- [ ] Integration coverage exists for anonymous access, owner-only list/open/update/delete behavior, create defaults including `tags: []`, and notebook JSON validation failure paths including malformed or missing tag fields.
 - [ ] Authenticated test fixtures support notebook tests through real or near-real session issuance rather than unauthenticated placeholders.
-- [ ] Documentation conflicts relevant to notebook persistence are reconciled, especially owner-only `404` behavior and any persistence field discrepancies.
+- [ ] Documentation conflicts relevant to notebook persistence are reconciled, especially owner-only `404` behavior and any persistence field discrepancies related to notebook-level or block-level tags.
 
 **Verification:**
 - [ ] `cd api && pytest -q`
@@ -221,7 +221,7 @@ Implement the Version 1 backend notebook persistence feature so authenticated us
   **Mitigation:** treat `api/docs/persistence.md` as the implementation source of truth and update conflicting docs during hardening.
 
 - **Risk:** the frontend mock editor currently uses in-memory notebook state and may not yet match the backend snapshot schema exactly.
-  **Mitigation:** keep validation rules explicit and surface any schema mismatch early so later frontend integration can adapt before sync work begins.
+  **Mitigation:** keep validation rules explicit, including `tags`, and surface any schema mismatch early so later frontend integration can adapt before sync work begins.
 
 - **Risk:** CRUD implementation could accidentally absorb sync scope and become too broad.
   **Mitigation:** defer `/sync`, conflict responses, and local-first reconciliation to the later sync direction, while only preserving the fields and revision semantics they require.
