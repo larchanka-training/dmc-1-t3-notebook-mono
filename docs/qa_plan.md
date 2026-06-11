@@ -146,6 +146,19 @@ Run against `https://notebook.com:8443` (after `hosts`, `docker compose`, and tr
 - Negative scenarios: infinite loop, `throw`, heavy loop — `error` output type, user message, tab does not hang (worker timeout where applicable).
 - **Isolation:** attempts to access `parent`, app `localStorage`, `fetch` to internal API with session cookie — expected restriction per security model (document expected behavior in test case after reviewing runtime implementation).
 
+### 5.4 Stage 5 acceptance checklist
+
+Use this checklist after Stage 5 runtime slices land to verify the notebook execution MVP as one coherent flow:
+
+1. `run current`: execute a single `code` block and verify output binds only to that block.
+2. Session reuse: execute an upper `code` block that declares shared state, then execute a lower `code` block and verify the state is still available without reset.
+3. `run from current downward`: start from a selected `code` block in a mixed notebook and verify only lower `code` blocks execute in notebook order while `text` blocks are skipped.
+4. `run all`: execute after a previous single-block run and verify the worker session resets before the full top-to-bottom code range starts.
+5. `stop`: start a long-running block, invoke stop, verify the UI shows `stopping` then `canceled`, and verify the next run starts from a clean worker session.
+6. Error and timeout UX: verify syntax/runtime error and timeout cases surface as user-visible runtime states and bound error outputs.
+7. Output rendering: verify `text`, `object`, `table`, and `error` outputs render next to the originating `code` block.
+8. Non-durable outputs: reload the page and verify runtime outputs do not reappear as part of durable notebook content before a new run.
+
 ---
 
 ## 6. End-to-end “API + UI” scenarios
