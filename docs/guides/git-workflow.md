@@ -252,6 +252,91 @@ git -C ui checkout <branch-or-commit>
 
 После такого переключения root почти наверняка покажет изменение submodule. Это нормально, если вы действительно готовите обновление указателя.
 
+## Почему `git submodule update --init --recursive` не подтянул новые изменения
+
+Это самый частый источник путаницы.
+
+Команда:
+
+```bash
+git submodule update --init --recursive
+```
+
+не означает:
+
+- "возьми последний `develop` из `api`";
+- "возьми последний `develop` из `ui`";
+- "подтяни самые свежие изменения из всех submodules".
+
+Она означает только одно:
+
+- переведи каждый submodule ровно на тот commit SHA, который записан в текущем коммите root-репозитория.
+
+Пример:
+
+- в `api` появился новый commit в ветке `docs/api-guide-update`;
+- в `ui` появился новый commit в ветке `docs/ui-guide-update`;
+- но root `develop` всё ещё указывает на старые SHA `api` и `ui`.
+
+В этом случае `git submodule update --init --recursive` отработает корректно, но оставит старые версии submodules, потому что root ещё не был обновлён.
+
+### Что должно произойти, чтобы обновление подтянулось у всех
+
+Нужно выполнить всю цепочку:
+
+1. закоммитить и запушить изменения в `api`;
+2. смёржить их в целевую ветку `api`-репозитория, обычно `develop`;
+3. закоммитить и запушить изменения в `ui`;
+4. смёржить их в целевую ветку `ui`-репозитория, обычно `develop`;
+5. в root обновить submodule pointers на новые коммиты `api` и `ui`;
+6. смёржить root PR.
+
+Только после шага 6 у коллег заработает:
+
+```bash
+git checkout develop
+git pull --ff-only
+git submodule update --init --recursive
+```
+
+### Как обновить указатели submodules в root
+
+Из root:
+
+```bash
+git checkout develop
+git pull --ff-only
+git checkout -b chore/update-submodule-pointers
+
+git -C api checkout develop
+git -C api pull --ff-only
+
+git -C ui checkout develop
+git -C ui pull --ff-only
+
+git add api ui
+git commit -m "chore: update api and ui submodule pointers"
+git push -u origin chore/update-submodule-pointers
+```
+
+После merge этого root PR команда `git submodule update --init --recursive` начнёт переводить `api` и `ui` на новые состояния.
+
+### Как проверить, что root уже смотрит на нужные submodule commits
+
+```bash
+git ls-tree HEAD api ui
+git submodule status
+git diff --submodule
+```
+
+Если нужно проверить удалённый `develop`, а не локальный `HEAD`:
+
+```bash
+git ls-tree origin/develop api ui
+```
+
+Именно этот вывод показывает, какие commit SHA submodules реально зафиксированы в root.
+
 ## Типовые сценарии
 
 ### Изменения только в `api/`
