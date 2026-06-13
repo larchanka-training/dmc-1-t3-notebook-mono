@@ -360,10 +360,13 @@ The README must cover the following sections exactly. Content may be prose or st
    ```
 3. **Browser certificate trust** (optional but removes browser warnings) — see `docs/Local-Proxy.md` for `mkcert` instructions; E2E tests bypass the warning via `ignoreHTTPSErrors: true` and do not require manual trust.
 4. **Playwright browsers** — run once after cloning:
-   ```bash
-   cd e2e
-   npm run e2e:install
-   ```
+```bash
+cd e2e
+# Preferred: uses the package script which installs required browser binaries
+npm run e2e:install
+# Fallback (works if the script fails or you prefer explicit install):
+npx playwright install chromium
+```
 
 ### 10.2 Starting the stack
 

@@ -23,6 +23,9 @@ Reference specification: `docs/prompts/QA-Implement-E2E-test-automation-with-Pla
 4. **Playwright browsers** — run once after cloning:
    ```bash
    cd e2e
+   # macOS / Windows — installs browser binary only (system deps already present):
+   npx playwright install chromium
+   # Linux (CI, Docker, WSL) — also installs OS-level system dependencies:
    npm run e2e:install
    ```
 
