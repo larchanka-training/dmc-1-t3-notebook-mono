@@ -108,7 +108,7 @@ variable "service_discovery" {
     namespace_name = string
     discovery_name = string
     container_name = string
-    container_port = number
+    container_port = optional(number)
   })
   default  = null
   nullable = true
