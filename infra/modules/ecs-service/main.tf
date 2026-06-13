@@ -244,7 +244,6 @@ resource "aws_ecs_service" "this" {
     content {
       registry_arn   = aws_service_discovery_service.this[0].arn
       container_name = service_registries.value.container_name
-      container_port = service_registries.value.container_port
     }
   }
 

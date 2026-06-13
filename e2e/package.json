@@ -1,0 +1,17 @@
+{
+  "name": "e2e",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "e2e": "playwright test --pass-with-no-tests",
+    "e2e:smoke": "playwright test --grep @smoke --pass-with-no-tests",
+    "e2e:install": "npx playwright install --with-deps chromium",
+    "e2e:install:local": "npx playwright install chromium",
+    "e2e:report": "playwright show-report playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.3"
+  }
+}

@@ -108,7 +108,9 @@ variable "service_discovery" {
     namespace_name = string
     discovery_name = string
     container_name = string
-    container_port = number
+    # container_port is only required for SRV-record or bridge/host network mode services.
+    # For awsvpc (Fargate) services with A-record DNS, this must be omitted; AWS rejects it.
+    container_port = optional(number)
   })
   default  = null
   nullable = true
