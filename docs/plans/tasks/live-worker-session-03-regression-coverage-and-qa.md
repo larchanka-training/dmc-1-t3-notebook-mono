@@ -2,7 +2,7 @@
 
 ## Status
 
-- `planned`
+- `done`
 
 ## Цель
 
@@ -54,12 +54,12 @@
 
 ## Acceptance criteria
 
-- [ ] В automated test suite есть отдельные regression scenarios для repeated `run current`, repeated `run from here`, `run all` reset и post-timeout/post-stop recovery
-- [ ] Есть проверка, что downstream повторные runs не вызывают upstream side-effect replay только ради восстановления state
-- [ ] Есть проверка, что shared state между sequential blocks сохраняется в live session до явного reset или terminate
-- [ ] Есть проверка, что syntax/runtime error обрабатываются по задокументированным правилам и не ломают следующий корректный run сильнее, чем это допускает contract
-- [ ] Manual verification checklist для Stage 6 фиксирует минимум сценарии repeated runs, reset, stop/timeout и output binding в mixed notebook
-- [ ] QA guidance не конфликтует с `docs/qa_plan.md` и текущими runtime architecture docs
+- [x] В automated test suite есть отдельные regression scenarios для repeated `run current`, repeated `run from here`, `run all` reset и post-timeout/post-stop recovery
+- [x] Есть проверка, что downstream повторные runs не вызывают upstream side-effect replay только ради восстановления state
+- [x] Есть проверка, что shared state между sequential blocks сохраняется в live session до явного reset или terminate
+- [x] Есть проверка, что syntax/runtime error обрабатываются по задокументированным правилам и не ломают следующий корректный run сильнее, чем это допускает contract
+- [x] Manual verification checklist для Stage 6 фиксирует минимум сценарии repeated runs, reset, stop/timeout и output binding в mixed notebook
+- [x] QA guidance не конфликтует с `docs/qa_plan.md` и текущими runtime architecture docs
 
 ## Verification
 
@@ -99,3 +99,6 @@
 - обновить документы из `Documentation impact`, если итоговый regression suite изменил recommended verification flow
 - если часть planned scenarios была сознательно опущена как дублирующая или слишком дорогая, явно зафиксировать это и чем она компенсирована
 - если для QA пришлось скорректировать существующие Stage 5 checks, кратко описать изменения
+- integration-level regression coverage добавлен в `ui/src/features/editor/ui/NotebookEditorView.test.tsx`: live-session reuse без upstream replay, timeout reset boundary/recovery и recovery после runtime/syntax errors
+- runtime-level coverage из `session-02` не дублировался сверх уже существующих `notebookRuntimeCore` и `notebookWorkerBridge` checks; post-stop recovery остаётся закреплённым на bridge level, а editor-level suite добирает timeout/error integration gaps
+- `docs/qa_plan.md` обновлён: Stage 5 acceptance checklist заменён на Stage 6 regression checklist для mixed notebooks с repeated runs, reset boundaries, stop/timeout, errors и output binding
