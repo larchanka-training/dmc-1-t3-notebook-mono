@@ -146,18 +146,19 @@ Run against `https://notebook.com:8443` (after `hosts`, `docker compose`, and tr
 - Negative scenarios: infinite loop, `throw`, heavy loop — `error` output type, user message, tab does not hang (worker timeout where applicable).
 - **Isolation:** attempts to access `parent`, app `localStorage`, `fetch` to internal API with session cookie — expected restriction per security model (document expected behavior in test case after reviewing runtime implementation).
 
-### 5.4 Stage 5 acceptance checklist
+### 5.4 Stage 6 regression checklist
 
-Use this checklist after Stage 5 runtime slices land to verify the notebook execution MVP as one coherent flow:
+Use this checklist for the current live worker session model to verify Stage 6 semantics in one mixed notebook flow (`text` + `code` blocks):
 
-1. `run current`: execute a single `code` block and verify output binds only to that block.
-2. Session reuse: execute an upper `code` block that declares shared state, then execute a lower `code` block and verify the state is still available without reset.
-3. `run from current downward`: start from a selected `code` block in a mixed notebook and verify only lower `code` blocks execute in notebook order while `text` blocks are skipped.
-4. `run all`: execute after a previous single-block run and verify the worker session resets before the full top-to-bottom code range starts.
-5. `stop`: start a long-running block, invoke stop, verify the UI shows `stopping` then `canceled`, and verify the next run starts from a clean worker session.
-6. Error and timeout UX: verify syntax/runtime error and timeout cases surface as user-visible runtime states and bound error outputs.
-7. Output rendering: verify `text`, `object`, `table`, and `error` outputs render next to the originating `code` block.
-8. Non-durable outputs: reload the page and verify runtime outputs do not reappear as part of durable notebook content before a new run.
+1. `run current`: execute one `code` block, verify output binds only to that block, then repeat the same `run current` and verify the rerun succeeds without declaration-replay artifacts.
+2. Shared session reuse: execute an upper setup block, then execute a lower block and verify shared values/functions remain available through the current `execution session`.
+3. Repeated `run from here`: in a mixed notebook, execute `run from here` on a lower `code` block twice and verify only the selected lower code range executes while upstream `code` blocks and intervening `text` blocks are not replayed just to rebuild state.
+4. `run all`: execute after prior partial runs and verify the worker session resets before the full top-to-bottom code range starts, so the run does not depend on stale live-session state from earlier commands.
+5. `stop`: start a long-running block, invoke stop, verify the UI shows `stopping` then `canceled`, and verify the next run starts from a clean worker session where missing upstream state stays explicit until setup blocks are rerun.
+6. Timeout recovery: trigger a timeout, verify the UI shows the timeout state and bound error output, then verify the next run also starts from a clean worker session with no hidden upstream replay fallback.
+7. Syntax and runtime errors: verify both error types surface as user-visible runtime states with bound `error` outputs, and verify a subsequent valid run still works unless a documented reset boundary (`run all`, `stop`, timeout) occurred.
+8. Output binding in mixed notebooks: verify `text`, `object`, `table`, and `error` outputs render next to the originating `code` block and never attach to neighboring `text` blocks.
+9. Non-durable outputs: reload the page and verify runtime outputs do not reappear as part of durable notebook content before a new run.
 
 ---
 
