@@ -2,7 +2,7 @@
 
 ## Status
 
-- `planned`
+- `done`
 
 ## Цель
 
@@ -111,3 +111,7 @@
 - обновить документы из `Documentation impact`, если итоговая live-session implementation изменила описанные runtime boundaries
 - если часть старых tests была переписана из-за implicit replay assumptions, кратко зафиксировать это в этой секции
 - если runtime contract пришлось скорректировать, перечислить минимальные совместимые изменения и причину
+- runtime core переведён с replay массива `sessionBlocks` на live worker-owned session scope с persistent top-level bindings внутри worker
+- transport contract между bridge/store и worker сохранён: используются те же `RUN_BLOCKS` / `RESET_SESSION` / `TERMINATE_SESSION` и те же normalized `execution-*` messages
+- runtime tests обновлены под live-session semantics: downstream reruns больше не предполагают upstream replay, добавлено покрытие для repeated mutable-state runs и persistent function rebinding
+- `ui/docs/runtime_architecture.md` обновлён под фактическую live-session implementation
