@@ -84,7 +84,7 @@ jobs:
           cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-ui:buildcache
           cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-ui:buildcache,mode=max
           build-args: |
-            VITE_API_URL=/api/v1
+            VITE_API_BASE_URL=/api/v1
 
       - name: Build and push API image
         uses: docker/build-push-action@v6

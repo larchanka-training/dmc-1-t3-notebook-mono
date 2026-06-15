@@ -95,9 +95,9 @@ jobs:
         working-directory: ui
         run: pnpm install --frozen-lockfile
 
-      - name: Format frontend code
+      - name: Check frontend formatting
         working-directory: ui
-        run: pnpm format
+        run: pnpm format:check
 
       - name: Run frontend verification
         working-directory: ui
