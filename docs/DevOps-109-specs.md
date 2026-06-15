@@ -226,23 +226,24 @@ Recommended approach:
   - `t3_notebook_prod`
 - preview environments should not create a full RDS instance per PR
 
-Preview database options:
+Preview database approach (implemented):
 
-1. Recommended initial option: one shared preview database instance with one schema or one database per PR if limits remain low.
-2. Alternative for lower complexity: one shared preview database and a naming convention per PR.
+Each preview PR receives its own dedicated RDS PostgreSQL instance (`db.t4g.micro`, Graviton2 ARM). The instance is provisioned automatically by the `modules/rds` Terraform module:
 
-For early delivery, the most practical option is:
+- identifier: `t3-notebook-pr-<number>`
+- database: `notebook`
+- password: auto-generated via `random_password` and stored in Secrets Manager
+- Secrets Manager secret name: `t3-notebook-pr-<number>-connection`
+- ECS task receives `DATABASE_URL` directly from the secret ARN — no manual configuration required
+- instance is destroyed with `terraform destroy` when the PR is closed
 
-- one shared preview PostgreSQL instance
-- one database per preview PR: `t3_notebook_pr_<number>`
+No GitHub Actions secret `PREVIEW_DATABASE_URL_SECRET_ARN` is required.
 
-Reasoning:
+Reasoning for dedicated instance per PR:
 
 - database isolation is clearer than schema-only isolation
-- teardown logic is simpler
+- teardown logic is simpler: `terraform destroy` removes the instance
 - it avoids accidental data overlap between previews
-
-Terraform should create the preview DB entry only if the workflow chooses full preview provisioning. If delivery speed matters more than perfect isolation, preview DB creation can be delegated to an initialization job executed after infrastructure apply.
 
 ## 9. Container Build Strategy
 
@@ -566,7 +567,7 @@ Responsibilities:
 
 - run Terraform destroy for the preview state key
 - remove preview routing
-- optionally drop the preview database if it exists
+- destroy the per-PR RDS instance and its Secrets Manager secret
 
 ### 14.5 Main deploy workflow
 
@@ -635,7 +636,8 @@ Per-PR resources:
 - target groups
 - listener rules
 - task definitions
-- optional preview database entry
+- dedicated RDS PostgreSQL instance (`db.t4g.micro`) for the PR
+- Secrets Manager secret with generated `DATABASE_URL`
 - runtime secrets/parameters scoped to the PR
 
 This is more cost-efficient than creating a full isolated network stack per PR, while still giving each preview its own running application containers.

@@ -22,6 +22,8 @@ State keys:
 Preview note:
 
 The preview Terraform root includes the prefix-stripping proxy required by the plan. The current UI still lacks configurable non-root base-path support, so the preview deployment workflow blocks rollout until the application side is ready.
+
+Each preview environment provisions its own dedicated RDS PostgreSQL instance (`db.t4g.micro`) via the `modules/rds` module. The module generates a random password, stores the full connection string in Secrets Manager, and passes the ARN directly to the ECS task definition. No manual secret configuration is required — `PREVIEW_DATABASE_URL_SECRET_ARN` was removed as a GitHub Actions secret and as a Terraform variable.
 # trigger
 # trigger
 # trigger

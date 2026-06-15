@@ -35,11 +35,6 @@ variable "api_image" {
   type = string
 }
 
-variable "database_url_secret_arn" {
-  description = "Secrets Manager ARN containing preview DATABASE_URL in the 'url' JSON field."
-  type        = string
-}
-
 variable "preview_proxy_image" {
   type    = string
   default = "nginx:1.27-alpine"
