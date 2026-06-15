@@ -38,6 +38,11 @@ variable "api_image" {
 variable "database_url_secret_arn" {
   description = "Secrets Manager ARN containing preview DATABASE_URL in the 'url' JSON field."
   type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:secretsmanager:", var.database_url_secret_arn))
+    error_message = "database_url_secret_arn must be a valid AWS Secrets Manager ARN (must start with 'arn:aws:secretsmanager:'). Set the PREVIEW_DATABASE_URL_SECRET_ARN GitHub secret."
+  }
 }
 
 variable "preview_proxy_image" {

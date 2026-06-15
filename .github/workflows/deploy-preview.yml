@@ -98,6 +98,13 @@ jobs:
           cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-api:buildcache
           cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-api:buildcache,mode=max
 
+      - name: Verify required secrets
+        run: |
+          if [[ -z "${PREVIEW_DATABASE_URL_SECRET_ARN}" ]]; then
+            echo "::error::PREVIEW_DATABASE_URL_SECRET_ARN secret is not set. Configure it in GitHub repository secrets before deploying preview environments."
+            exit 1
+          fi
+
       - name: Terraform apply preview root
         run: |
           terraform -chdir=infra/env/preview init \
