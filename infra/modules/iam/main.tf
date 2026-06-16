@@ -49,3 +49,35 @@ resource "aws_iam_role" "proxy_task" {
     Name = "${var.name_prefix}-proxy-task"
   })
 }
+
+# ECS Exec requires ssmmessages permissions on the task role
+data "aws_iam_policy_document" "ecs_exec" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "ssmmessages:CreateControlChannel",
+      "ssmmessages:CreateDataChannel",
+      "ssmmessages:OpenControlChannel",
+      "ssmmessages:OpenDataChannel",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "api_task_ecs_exec" {
+  name   = "ecs-exec"
+  role   = aws_iam_role.api_task.name
+  policy = data.aws_iam_policy_document.ecs_exec.json
+}
+
+resource "aws_iam_role_policy" "ui_task_ecs_exec" {
+  name   = "ecs-exec"
+  role   = aws_iam_role.ui_task.name
+  policy = data.aws_iam_policy_document.ecs_exec.json
+}
+
+resource "aws_iam_role_policy" "proxy_task_ecs_exec" {
+  name   = "ecs-exec"
+  role   = aws_iam_role.proxy_task.name
+  policy = data.aws_iam_policy_document.ecs_exec.json
+}
