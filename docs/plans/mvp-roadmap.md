@@ -41,7 +41,8 @@ Based on the current repository state:
 - documentation and architecture are ahead of implementation
 - frontend shell and mock editor foundation already exist
 - backend `Email + OTP` auth and session flows are implemented and covered by integration tests
-- Google OAuth, notebook persistence backend, sync, AI, and real execution runtime are still incomplete as end-to-end product capabilities
+- the browser execution runtime is implemented as the current baseline, including the completed live-worker-session follow-up migration
+- Google OAuth, notebook persistence backend, sync, AI, export, and full release-readiness are still incomplete as end-to-end product capabilities
 - notebook backend and AI backend feature modules are still skeletal
 
 This roadmap therefore starts from the current partial foundation, not from zero.
@@ -208,7 +209,7 @@ The repository already has persistence-related ADRs and auth state persistence i
 
 **Status**
 
-`planned`
+`done`
 
 **Goal**
 
@@ -228,6 +229,14 @@ Make notebooks executable in the browser with preserved `execution session` and 
 - session reset/reuse rules
 - outputs: `text`, `object`, `table`, `error`
 - chart output support either in this stage or immediately after
+
+**Current note**
+
+Stage 5 core runtime behavior is already implemented.
+
+The later transition from replay-based restoration to a live worker-owned session is also complete and is documented in [06-live-worker-session-transition-plan.md](./06-live-worker-session-transition-plan.md).
+
+That historical artifact should be read as a closed runtime follow-up slice, not as the current next roadmap stage in this MVP sequence.
 
 **Blocks**
 
@@ -369,14 +378,15 @@ Existing:
 
 - [01-auth-backend-plan.md](./01-auth-backend-plan.md)
 - [02-notebook-persistence-plan.md](./02-notebook-persistence-plan.md)
+- [05-execution-runtime.md](./05-execution-runtime.md)
+- [06-live-worker-session-transition-plan.md](./06-live-worker-session-transition-plan.md)
 
-Recommended next direction plans:
+Recommended next direction plans for still-open roadmap areas:
 
 - `docs/plans/03-local-first-persistence-plan.md`
-- `docs/plans/04-execution-runtime-plan.md`
-- `docs/plans/05-sync-plan.md`
-- `docs/plans/06-ai-integration-plan.md`
-- `docs/plans/07-release-readiness-plan.md`
+- `docs/plans/04-sync-plan.md`
+- `docs/plans/05-ai-integration-plan.md`
+- `docs/plans/06-release-readiness-plan.md`
 
 ## Recommended Execution Order
 
@@ -387,7 +397,7 @@ Use this as the default delivery order unless a narrower approved task overrides
 3. close the remaining Stage 2 auth scope or explicitly defer `Google OAuth`
 4. complete Stage 3 notebook persistence backend
 5. implement Stage 4 local-first persistence
-6. implement Stage 5 runtime MVP
+6. treat Stage 5 runtime MVP as complete and avoid reopening it unless a new approved runtime task says otherwise
 7. implement Stage 6 sync and conflict handling
 8. implement Stage 7 AI-assisted workflow
 9. finish Stage 8 export and release hardening
