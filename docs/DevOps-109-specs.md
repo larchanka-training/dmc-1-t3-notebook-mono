@@ -456,7 +456,46 @@ These credentials must belong to `deploy-user`.
 - ECR push and pull for `t3-notebook-ui` and `t3-notebook-api`
 - ECS, ALB, CloudWatch, IAM pass-role, RDS, Secrets Manager or SSM, and networking resources limited to `t3` infrastructure
 
-### 13.3 Follow-up improvement
+### 13.3 ECS Exec access
+
+ECS Exec (`aws ecs execute-command`) is enabled on all ECS services via `enable_execute_command = true` in the `ecs-service` module.
+
+For ECS Exec to work, each task role must have the following permissions:
+
+- `ssmmessages:CreateControlChannel`
+- `ssmmessages:CreateDataChannel`
+- `ssmmessages:OpenControlChannel`
+- `ssmmessages:OpenDataChannel`
+
+These permissions are attached to the `api`, `ui`, and `proxy` task roles via the `ecs-exec` inline policy in `modules/iam`.
+
+To connect interactively to a running container:
+
+```bash
+# Find the task ID
+aws ecs list-tasks \
+  --cluster t3-notebook-cluster \
+  --service-name t3-notebook-prod-api \
+  --query 'taskArns[0]' \
+  --output text
+
+# Open a shell
+aws ecs execute-command \
+  --cluster t3-notebook-cluster \
+  --task <task-arn> \
+  --container api \
+  --interactive \
+  --command "/bin/sh"
+```
+
+Requirements for the operator's own IAM identity:
+
+- `ecs:ExecuteCommand` on the target task resource
+- AWS CLI v2 with the `session-manager-plugin` installed locally
+
+Terraform apply is managed through GitHub Actions (`deploy-main.yml`). Do not run `terraform apply` locally because all Terraform state is stored in the remote S3 backend.
+
+### 13.4 Follow-up improvement
 
 After the first working delivery, migrate GitHub Actions authentication to `GitHub OIDC` if the AWS access model can be updated. This is recommended, but it is not required for the initial rollout because the current constraint already defines static secrets.
 
