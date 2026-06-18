@@ -10,7 +10,7 @@
 
 ## Контекст
 
-- `docs/plans/06-live-worker-session-transition-plan.md`
+- `docs/plans/04-live-worker-session-transition-plan.md`
 - `docs/requirements.md`
 - `docs/project.md`
 - `docs/system_architecture.md`
@@ -98,7 +98,7 @@
 - [ ] `cd ui && ./node_modules/.bin/vitest run src/features/execution/lib/notebookRuntimeCore.test.ts src/features/execution/lib/notebookWorkerBridge.test.ts`
 - [ ] review docs diff в `ui/docs/runtime_architecture.md` и убедиться, что replay model описана как current limitation, а не как target architecture
 - [ ] вручную проверить, что task artifact не оставляет неявного fallback для `run from here` на fresh session и не оставляет post-error session validity на усмотрение следующей implementation task
-- [ ] вручную сверить task artifact с `docs/plans/06-live-worker-session-transition-plan.md`, чтобы acceptance criteria не выходили за рамки approved plan
+- [ ] вручную сверить task artifact с `docs/plans/04-live-worker-session-transition-plan.md`, чтобы acceptance criteria не выходили за рамки approved plan
 
 ## Dependencies
 
@@ -110,14 +110,14 @@
 - `ui/docs/adr/ADR-003-runtime-execution-model.md`
 - `ui/src/features/execution/lib/notebookRuntimeCore.test.ts`
 - `ui/src/features/execution/lib/notebookWorkerBridge.test.ts`
-- `docs/plans/06-live-worker-session-transition-plan.md`
+- `docs/plans/04-live-worker-session-transition-plan.md`
 
 ## Documentation impact
 
 - `Required:`
 - `ui/docs/runtime_architecture.md`
 - `ui/docs/adr/ADR-003-runtime-execution-model.md`
-- `docs/plans/06-live-worker-session-transition-plan.md`
+- `docs/plans/04-live-worker-session-transition-plan.md`
 
 ## Риски / заметки
 

@@ -10,7 +10,7 @@
 
 ## Контекст
 
-- `docs/plans/05-execution-runtime.md`
+- `docs/plans/03-execution-runtime.md`
 - `docs/plans/mvp-roadmap.md`
 - `docs/requirements.md`
 - `docs/system_architecture.md`
@@ -127,7 +127,7 @@
 - `executionStore` now owns execution lifecycle and runtime outputs; editor-local placeholder execution state is no longer the source of truth
 - output rendering was moved off the placeholder model to `OutputItem[]` owned by `executionStore`
 - documentation updated in:
-  - `docs/plans/05-execution-runtime.md`
+  - `docs/plans/03-execution-runtime.md`
   - `ui/docs/runtime_architecture.md`
   - `ui/docs/ui_architecture.md`
   - `ui/docs/state_model.md`

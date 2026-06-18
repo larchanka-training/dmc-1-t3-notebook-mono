@@ -234,7 +234,7 @@ Make notebooks executable in the browser with preserved `execution session` and 
 
 Stage 5 core runtime behavior is already implemented.
 
-The later transition from replay-based restoration to a live worker-owned session is also complete and is documented in [06-live-worker-session-transition-plan.md](./06-live-worker-session-transition-plan.md).
+The later transition from replay-based restoration to a live worker-owned session is also complete and is documented in [04-live-worker-session-transition-plan.md](./04-live-worker-session-transition-plan.md).
 
 That historical artifact should be read as a closed runtime follow-up slice, not as the current next roadmap stage in this MVP sequence.
 
@@ -378,8 +378,8 @@ Existing:
 
 - [01-auth-backend-plan.md](./01-auth-backend-plan.md)
 - [02-notebook-persistence-plan.md](./02-notebook-persistence-plan.md)
-- [05-execution-runtime.md](./05-execution-runtime.md)
-- [06-live-worker-session-transition-plan.md](./06-live-worker-session-transition-plan.md)
+- [03-execution-runtime.md](./03-execution-runtime.md)
+- [04-live-worker-session-transition-plan.md](./04-live-worker-session-transition-plan.md)
 
 Recommended next direction plans for still-open roadmap areas:
 
