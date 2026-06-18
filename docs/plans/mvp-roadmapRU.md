@@ -234,7 +234,7 @@ MVP должен дать основной сценарий работы с `Jav
 
 Базовое runtime-поведение Stage 5 уже реализовано.
 
-Более поздний переход от replay-based восстановления состояния к live worker-owned session тоже завершён и зафиксирован в [06-live-worker-session-transition-plan.md](./06-live-worker-session-transition-plan.md).
+Более поздний переход от replay-based восстановления состояния к live worker-owned session тоже завершён и зафиксирован в [04-live-worker-session-transition-plan.md](./04-live-worker-session-transition-plan.md).
 
 Этот исторический артефакт нужно читать как закрытый follow-up slice по runtime, а не как следующий активный этап в текущей MVP-последовательности.
 
@@ -378,8 +378,8 @@ flowchart TD
 
 - [01-auth-backend-plan.md](./01-auth-backend-plan.md)
 - [02-notebook-persistence-plan.md](./02-notebook-persistence-plan.md)
-- [05-execution-runtime.md](./05-execution-runtime.md)
-- [06-live-worker-session-transition-plan.md](./06-live-worker-session-transition-plan.md)
+- [03-execution-runtime.md](./03-execution-runtime.md)
+- [04-live-worker-session-transition-plan.md](./04-live-worker-session-transition-plan.md)
 
 Далее рекомендуется добавить для ещё открытых областей roadmap:
 

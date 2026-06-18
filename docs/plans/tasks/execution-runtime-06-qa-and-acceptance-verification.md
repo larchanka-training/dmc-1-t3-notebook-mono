@@ -10,7 +10,7 @@
 
 ## Контекст
 
-- `docs/plans/05-execution-runtime.md`
+- `docs/plans/03-execution-runtime.md`
 - `docs/plans/tasks/execution-runtime-01-execution-contracts-and-store.md`
 - `docs/plans/tasks/execution-runtime-02-worker-runtime-bridge-and-lifecycle.md`
 - `docs/plans/tasks/execution-runtime-03-orchestrator-run-sequencing.md`
@@ -86,7 +86,7 @@
 
 - `Conditional:`
 - `docs/qa_plan.md`
-- `docs/plans/05-execution-runtime.md`
+- `docs/plans/03-execution-runtime.md`
 
 ## Риски / заметки
 
@@ -109,4 +109,4 @@
 - documentation updated:
   - `docs/qa_plan.md`
 - delta from original scope:
-  - no additional `docs/plans/05-execution-runtime.md` changes were required because the Stage 5 readiness model itself did not change; only the executable verification checklist was expanded
+  - no additional `docs/plans/03-execution-runtime.md` changes were required because the Stage 5 readiness model itself did not change; only the executable verification checklist was expanded

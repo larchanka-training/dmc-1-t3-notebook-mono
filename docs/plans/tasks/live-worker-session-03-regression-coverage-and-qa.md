@@ -10,7 +10,7 @@
 
 ## Контекст
 
-- `docs/plans/06-live-worker-session-transition-plan.md`
+- `docs/plans/04-live-worker-session-transition-plan.md`
 - `docs/plans/tasks/live-worker-session-01-target-semantics-and-contracts.md`
 - `docs/plans/tasks/live-worker-session-02-runtime-core-migration.md`
 - `docs/qa_plan.md`
@@ -85,7 +85,7 @@
 - `Conditional:`
 - `docs/qa_plan.md`
 - `ui/docs/runtime_architecture.md`
-- `docs/plans/06-live-worker-session-transition-plan.md`
+- `docs/plans/04-live-worker-session-transition-plan.md`
 
 ## Риски / заметки
 

@@ -103,7 +103,14 @@ Use a short imperative title that states the work type and area.
 
 For this repository, use the established prefix format:
 
-`T3/BTF -> AREA: Short imperative description`
+`<SPRINT_SHORT_NAME> -> AREA: Short imperative description`
+
+Where `SPRINT_SHORT_NAME` is the short sprint name agreed for the current task batch.
+
+Examples:
+
+- sprint 2 -> `AI`
+- another sprint can use its own short label when defined in the current plan or task context
 
 Where `AREA` is one of:
 
@@ -115,11 +122,11 @@ Where `AREA` is one of:
 
 Good:
 
-- `T3/BTF -> BACK: Реализовать session bootstrap для auth`
-- `T3/BTF -> FRONT: Подключить notebook sync API`
-- `T3/BTF -> DEVOPS: Настроить CI проверку API contracts`
-- `T3/BTF -> QA: Подготовить smoke-проверку auth flow`
-- `T3/BTF -> RESEARCH: Зафиксировать conflict UX для sync`
+- `AI -> BACK: Реализовать session bootstrap для auth`
+- `AI -> FRONT: Подключить notebook sync API`
+- `AI -> DEVOPS: Настроить CI проверку API contracts`
+- `AI -> QA: Подготовить smoke-проверку auth flow`
+- `AI -> RESEARCH: Зафиксировать conflict UX для sync`
 
 Bad:
 
@@ -255,7 +262,7 @@ Rules:
 
 Good:
 
-- `Depends on T3/BTF -> BACK: Подготовить auth persistence и contract`
+- `Depends on AI -> BACK: Подготовить auth persistence и contract`
 - `Requires merged Alembic migration for auth sessions`
 - `Depends on approved notebook sync contract update`
 
@@ -361,9 +368,9 @@ For medium or large work, split in this order:
 
 Example:
 
-- `T3/BTF -> BACK: Подготовить auth persistence и contract`
-- `T3/BTF -> BACK: Реализовать Email + OTP login`
-- `T3/BTF -> BACK: Реализовать session bootstrap и logout`
+- `AI -> BACK: Подготовить auth persistence и contract`
+- `AI -> BACK: Реализовать Email + OTP login`
+- `AI -> BACK: Реализовать session bootstrap и logout`
 
 This is usually better than one oversized "implement auth" task.
 
@@ -499,7 +506,7 @@ When writing the issue:
 - be direct
 - use short sections
 - keep bullets concrete
-- use the `T3/BTF -> AREA: ...` title format consistently
+- use the `<SPRINT_SHORT_NAME> -> AREA: ...` title format consistently
 - prefer exact routes, models, states, files
 - prefer repository artifact references over long pasted chat summaries
 - prefer `docs/plans/tasks/<task-slug>-NN-<short-slice>.md` naming over ad hoc filenames
@@ -509,7 +516,7 @@ When writing the issue:
 
 Good:
 
-- `T3/BTF -> BACK: Подключить auth router в api/app/api/v1/router.py`
+- `AI -> BACK: Подключить auth router в api/app/api/v1/router.py`
 
 Bad:
 

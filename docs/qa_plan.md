@@ -103,6 +103,24 @@ Repository stack: **FastAPI**, **PostgreSQL**, **Alembic**. Coverage areas below
 - Successful code generation/refinement for selected block; external LLM timeout/5xx → predictable error for UI.
 - Response treated as **untrusted**: not executed on server; after insertion on frontend — normal editable block content.
 
+### 4.5.1 First AI slice acceptance ownership
+
+The first AI vertical slice uses a narrow acceptance gate aligned with the testing pyramid:
+
+- **Backend integration is merge-blocking** for auth/session gate, notebook access gate, prompt-policy rejection, provider failure mapping, extraction failure, syntax-invalid final failure, and repair-retry success.
+- **Frontend integration is merge-blocking** for deterministic context assembly (`scope: this`, `scope: notebook`), local-notebook blocking before request dispatch, prompt preservation, and insertion into an existing empty `code` block or a newly created `code` block.
+- **Manual integrated smoke is release-blocking but not per-merge blocking** until a dedicated Playwright `@ai` scenario exists. The required smoke is: open a synced notebook, generate code from a source `text` block, confirm insertion below the source block, and verify the inserted code remains editable and executable.
+
+Current first-slice suites:
+
+- Backend: `api/tests/integration/ai/test_endpoint.py`
+- Backend validation pipeline: `api/tests/integration/ai/test_validation_pipeline.py`
+- Frontend API contract mapping: `ui/src/features/ai/api/aiApi.test.ts`
+- Frontend context builder: `ui/src/features/ai/model/contextBuilder.test.ts`
+- Frontend notebook insertion flow: `ui/src/pages/notebook-editor/ui/NotebookEditorPage.test.tsx`
+
+This means the first slice does **not** require broad AI E2E automation before merge. The narrow browser-level AI flow remains a follow-up under the existing `@ai` Playwright tag plan.
+
 ### 4.6 API non-functional aspects
 
 - **Security:** no SQL injection (parameterized queries), rate limiting (if added), no internal error leakage in responses; LLM and OAuth credentials only on backend.
@@ -192,6 +210,7 @@ Use this checklist for the current live worker session model to verify Stage 6 s
 - API: smoke + critical integration test set green in CI.
 - Both login methods (OTP and Google) verified at least in smoke scope.
 - Known limitations documented (self-signed SSL, port `:8443` for local HTTPS).
+- For the first AI vertical slice specifically, the merge gate is the initial acceptance subset in `docs/ai-test-cases.md`, backed by the listed backend/frontend integration suites plus one manual integrated smoke.
 
 ---
 

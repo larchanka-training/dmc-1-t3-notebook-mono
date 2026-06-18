@@ -268,6 +268,12 @@ This keeps requests cheaper, faster, and less likely to confuse the model.
 
 ## 7. AI Service API
 
+The canonical Version 1 backend request/response and error contract is defined in:
+
+- `api/docs/ai_contract.md`
+
+This section is intentionally a high-level architectural summary and must not diverge from that contract document.
+
 ### 7.1 Canonical Route
 
 Canonical AI route:
@@ -276,9 +282,20 @@ Canonical AI route:
 
 This remains the single block-oriented AI endpoint for Version 1.
 
-### 7.2 Request Shape
+### 7.2 Request Summary
 
-Recommended request shape:
+The backend request contains:
+
+- `notebookId`
+- `sourceBlockId`
+- `mode`
+- `prompt`
+- `context`
+- `insertionStrategy`
+
+The full canonical payload shape, field rules, size limits, and enums are fixed in the contract artifact above.
+
+Illustrative request:
 
 ```json
 {
@@ -303,14 +320,12 @@ Recommended request shape:
         "source": "const headers = ['year', 'amount'];"
       }
     ],
-    "insertion": {
-      "strategy": "next-empty-or-new-after-source"
-    }
-  }
+  },
+  "insertionStrategy": "next-empty-or-new-after-source"
 }
 ```
 
-### 7.3 Request Rules
+### 7.3 Request Rules Summary
 
 Request rules:
 
@@ -322,29 +337,34 @@ Request rules:
 - `context.language` must be `javascript` in Version 1
 - notebook ownership and authenticated access are enforced on the backend
 - prompt-injection screening is enforced on the backend before the provider call
+- request size limits are enforced before the provider call
+- `insertionStrategy` must be `next-empty-or-new-after-source` in Version 1
 
-### 7.4 Response Shape
+### 7.4 Success Response Summary
 
-Recommended success response:
+Illustrative success response:
 
 ```json
 {
   "requestId": "air_123",
   "status": "success",
   "code": "function parseTaxes(csvText) {\\n  return [];\\n}",
-  "provider": "bedrock",
-  "model": "anthropic.claude-3-haiku",
-  "warnings": [],
+  "provider": {
+    "name": "bedrock",
+    "model": "anthropic.claude-3-haiku"
+  },
   "validation": {
     "extractionApplied": true,
-    "syntaxOk": true
-  }
+    "syntaxOk": true,
+    "repairAttempts": 0
+  },
+  "warnings": []
 }
 ```
 
-### 7.5 Error Response Shape
+### 7.5 Error Response Summary
 
-Recommended error response:
+Illustrative error response:
 
 ```json
 {
@@ -592,12 +612,13 @@ The AI pipeline must handle at least the following error classes:
 - invalid request payload
 - unauthorized notebook access
 - non-code prompt rejection
+- unsafe prompt rejection
 - provider timeout
 - provider unavailable
 - malformed provider response
 - code extraction failure
 - syntax validation failure
-- local fallback unavailable
+- frontend-local fallback unavailable
 
 ### 12.2 Recommended Error Codes
 
@@ -612,7 +633,8 @@ Recommended normalized backend error codes:
 - `AI_RESPONSE_INVALID`
 - `AI_CODE_EXTRACTION_FAILED`
 - `AI_CODE_SYNTAX_INVALID`
-- `AI_FALLBACK_UNAVAILABLE`
+
+`AI_FALLBACK_UNAVAILABLE` remains a frontend-local fallback concern and is not part of the backend contract for `POST /api/v1/ai/code-blocks/generate`.
 
 ### 12.3 Frontend Error Behavior
 
