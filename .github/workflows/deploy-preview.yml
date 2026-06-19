@@ -24,7 +24,6 @@ env:
   AWS_ACCOUNT_ID: "867633231218"
   AWS_REGION: eu-north-1
   ECR_REGISTRY: 867633231218.dkr.ecr.eu-north-1.amazonaws.com
-  PREVIEW_DATABASE_URL_SECRET_ARN: ${{ secrets.PREVIEW_DATABASE_URL_SECRET_ARN }}
   TF_STATE_BUCKET: dmc-1-t3-notebook-terraform-state
   TF_LOCK_TABLE: dmc-1-t3-notebook-terraform-lock
   TF_IN_AUTOMATION: "true"
@@ -84,7 +83,7 @@ jobs:
           cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-ui:buildcache
           cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-ui:buildcache,mode=max
           build-args: |
-            VITE_API_BASE_URL=/api/v1
+            VITE_API_URL=/api/v1
 
       - name: Build and push API image
         uses: docker/build-push-action@v6
@@ -98,13 +97,6 @@ jobs:
           cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-api:buildcache
           cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-api:buildcache,mode=max
 
-      - name: Verify required secrets
-        run: |
-          if [[ -z "${PREVIEW_DATABASE_URL_SECRET_ARN}" ]]; then
-            echo "::error::PREVIEW_DATABASE_URL_SECRET_ARN secret is not set. Configure it in GitHub repository secrets before deploying preview environments."
-            exit 1
-          fi
-
       - name: Terraform apply preview root
         run: |
           terraform -chdir=infra/env/preview init \
@@ -116,7 +108,6 @@ jobs:
             -var "pr_number=${PR_NUMBER}" \
             -var "ui_image=${ECR_REGISTRY}/t3-notebook-ui:${IMAGE_TAG}" \
             -var "api_image=${ECR_REGISTRY}/t3-notebook-api:${IMAGE_TAG}" \
-            -var "database_url_secret_arn=${PREVIEW_DATABASE_URL_SECRET_ARN}" \
             -var "deploy_nonce=${GITHUB_SHA}"
 
       - name: Write summary

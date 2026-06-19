@@ -53,6 +53,23 @@ locals {
   }
 }
 
+module "db" {
+  source = "../../modules/rds"
+
+  identifier              = "t3-notebook-pr-${var.pr_number}"
+  db_name                 = "notebook"
+  vpc_id                  = data.terraform_remote_state.shared.outputs.vpc_id
+  subnet_ids              = data.terraform_remote_state.shared.outputs.private_db_subnet_ids
+  allowed_cidr_blocks     = [data.terraform_remote_state.shared.outputs.vpc_cidr]
+  instance_class          = "db.t4g.micro"
+  allocated_storage       = 20
+  deletion_protection     = false
+  skip_final_snapshot     = true
+  backup_retention_period = 0
+
+  tags = local.tags
+}
+
 module "ui_service" {
   source = "../../modules/ecs-service"
 
@@ -112,7 +129,7 @@ module "api_service" {
         DEPLOY_NONCE         = var.deploy_nonce
       }
       secrets = {
-        DATABASE_URL = "${var.database_url_secret_arn}:url::"
+        DATABASE_URL = "${module.db.connection_secret_arn}:url::"
       }
       port_mappings = [{
         container_port = 8000

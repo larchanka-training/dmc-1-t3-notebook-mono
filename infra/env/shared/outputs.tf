@@ -26,6 +26,10 @@ output "task_execution_role_arn" {
   value = module.iam.task_execution_role_arn
 }
 
+output "task_execution_role_name" {
+  value = module.iam.task_execution_role_name
+}
+
 output "ui_task_role_arn" {
   value = module.iam.ui_task_role_arn
 }

@@ -122,3 +122,19 @@ module "ui_service" {
   }
   tags = local.tags
 }
+
+resource "aws_iam_role_policy" "task_execution_secrets" {
+  name = "t3-notebook-${var.environment}-task-execution-secrets"
+  role = data.terraform_remote_state.shared.outputs.task_execution_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = [module.database.connection_secret_arn]
+      }
+    ]
+  })
+}
