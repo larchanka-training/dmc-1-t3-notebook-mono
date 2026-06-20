@@ -85,12 +85,18 @@ jobs:
           build-args: |
             VITE_API_URL=/api/v1
 
+      - name: Capture build metadata
+        id: meta
+        run: echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%S UTC')" >> $GITHUB_OUTPUT
+
       - name: Build and push API image
         uses: docker/build-push-action@v6
         with:
           context: ./api
           file: ./api/Dockerfile
           push: true
+          build-args: |
+            BUILD_TIME=${{ steps.meta.outputs.build_time }}
           tags: |
             ${{ env.ECR_REGISTRY }}/t3-notebook-api:${{ env.IMAGE_TAG }}
             ${{ env.ECR_REGISTRY }}/t3-notebook-api:pr-${{ env.PR_NUMBER }}-latest

@@ -60,6 +60,10 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Capture build metadata
+        id: meta
+        run: echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%S UTC')" >> $GITHUB_OUTPUT
+
       - name: Build and push API image
         uses: docker/build-push-action@v6
         with:
@@ -68,6 +72,7 @@ jobs:
           push: true
           build-args: |
             GIT_BRANCH=${{ github.ref_name }}
+            BUILD_TIME=${{ steps.meta.outputs.build_time }}
           tags: |
             ${{ env.ECR_REGISTRY }}/t3-notebook-api:${{ env.IMAGE_TAG }}
             ${{ env.ECR_REGISTRY }}/t3-notebook-api:main-latest
