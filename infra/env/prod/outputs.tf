@@ -25,3 +25,8 @@ output "ui_cloudfront_distribution_id" {
 output "database_secret_arn" {
   value = module.database.connection_secret_arn
 }
+
+output "api_config_secret_arn" {
+  value       = aws_secretsmanager_secret.api_config.arn
+  description = "ARN of the API configuration secret. Populate its value via AWS CLI before first deploy."
+}

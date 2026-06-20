@@ -54,6 +54,45 @@ module "ui" {
   tags              = local.tags
 }
 
+# Single AWS secret for all API application configuration.
+# Stored in plain-text ini (KEY=VALUE) format.
+# Terraform creates the secret resource and a one-time placeholder version.
+# The real secret VALUE must be set once via AWS CLI or console and is
+# never overwritten by Terraform (see lifecycle.ignore_changes).
+resource "aws_secretsmanager_secret" "api_config" {
+  name                    = "t3-notebook-${var.environment}/api-config"
+  description             = "API application configuration in KEY=VALUE ini format"
+  recovery_window_in_days = 7
+
+  tags = merge(local.tags, {
+    Name = "t3-notebook-${var.environment}/api-config"
+  })
+}
+
+resource "aws_secretsmanager_secret_version" "api_config_placeholder" {
+  secret_id = aws_secretsmanager_secret.api_config.id
+
+  # Placeholder created on first apply only.
+  # Replace actual values via:
+  #   aws secretsmanager put-secret-value \
+  #     --secret-id t3-notebook-prod/api-config \
+  #     --secret-string "$(cat api/.env.prod)"
+  secret_string = <<-EOT
+    AUTH_OTP_HASH_SECRET=CHANGE_ME
+    AUTH_SESSION_HASH_SECRET=CHANGE_ME
+    AUTH_OAUTH_STATE_SIGNING_SECRET=CHANGE_ME
+    GOOGLE_OAUTH_CLIENT_ID=CHANGE_ME
+    GOOGLE_OAUTH_CLIENT_SECRET=CHANGE_ME
+    GOOGLE_OAUTH_REDIRECT_URI=https://CHANGE_ME/api/v1/auth/google/callback
+    GOOGLE_OAUTH_SUCCESS_REDIRECT_URL=https://CHANGE_ME/
+    GOOGLE_OAUTH_ERROR_REDIRECT_URL=https://CHANGE_ME/auth/error
+  EOT
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
 module "api_service" {
   source = "../../modules/ecs-service"
 
@@ -76,6 +115,8 @@ module "api_service" {
         LOG_LEVEL            = var.log_level
         BACKEND_CORS_ORIGINS = "https://${module.ui.cloudfront_domain_name}"
         DEPLOY_NONCE         = var.deploy_nonce
+        AWS_DEFAULT_REGION   = var.aws_region
+        AWS_APP_SECRET_ARN   = aws_secretsmanager_secret.api_config.arn
       }
       secrets = {
         DATABASE_URL = "${module.database.connection_secret_arn}:url::"
@@ -104,9 +145,12 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [module.database.connection_secret_arn]
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = [
+          module.database.connection_secret_arn,
+          aws_secretsmanager_secret.api_config.arn,
+        ]
       }
     ]
   })
