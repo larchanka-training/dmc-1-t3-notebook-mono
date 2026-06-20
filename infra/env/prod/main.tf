@@ -86,6 +86,7 @@ resource "aws_secretsmanager_secret_version" "api_config_placeholder" {
     GOOGLE_OAUTH_REDIRECT_URI=https://CHANGE_ME/api/v1/auth/google/callback
     GOOGLE_OAUTH_SUCCESS_REDIRECT_URL=https://CHANGE_ME/
     GOOGLE_OAUTH_ERROR_REDIRECT_URL=https://CHANGE_ME/auth/error
+    SES_FROM_EMAIL=CHANGE_ME
   EOT
 
   lifecycle {
@@ -169,6 +170,22 @@ resource "aws_iam_role_policy" "api_task_secrets" {
         Effect = "Allow"
         Action = ["secretsmanager:GetSecretValue"]
         Resource = [aws_secretsmanager_secret.api_config.arn]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "api_task_ses" {
+  name = "t3-notebook-${var.environment}-api-task-ses"
+  role = data.terraform_remote_state.shared.outputs.api_task_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ses:SendEmail"]
+        Resource = "*"
       }
     ]
   })
