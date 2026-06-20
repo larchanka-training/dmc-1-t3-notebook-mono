@@ -137,6 +137,7 @@ module "api_service" {
   tags = local.tags
 }
 
+# Execution role: pulls DATABASE_URL secret at container start (ECS secrets injection)
 resource "aws_iam_role_policy" "task_execution_secrets" {
   name = "t3-notebook-${var.environment}-task-execution-secrets"
   role = data.terraform_remote_state.shared.outputs.task_execution_role_name
@@ -151,6 +152,23 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
           module.database.connection_secret_arn,
           aws_secretsmanager_secret.api_config.arn,
         ]
+      }
+    ]
+  })
+}
+
+# Task role: app calls GetSecretValue at runtime via boto3 (_load_aws_secret)
+resource "aws_iam_role_policy" "api_task_secrets" {
+  name = "t3-notebook-${var.environment}-api-task-secrets"
+  role = data.terraform_remote_state.shared.outputs.api_task_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = [aws_secretsmanager_secret.api_config.arn]
       }
     ]
   })

@@ -18,6 +18,11 @@ output "api_task_role_arn" {
   value       = aws_iam_role.api_task.arn
 }
 
+output "api_task_role_name" {
+  description = "API task role name."
+  value       = aws_iam_role.api_task.name
+}
+
 output "proxy_task_role_arn" {
   description = "Proxy task role ARN."
   value       = aws_iam_role.proxy_task.arn

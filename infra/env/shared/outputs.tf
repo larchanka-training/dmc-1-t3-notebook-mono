@@ -38,6 +38,10 @@ output "api_task_role_arn" {
   value = module.iam.api_task_role_arn
 }
 
+output "api_task_role_name" {
+  value = module.iam.api_task_role_name
+}
+
 output "proxy_task_role_arn" {
   value = module.iam.proxy_task_role_arn
 }
