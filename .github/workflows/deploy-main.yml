@@ -60,20 +60,9 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push UI image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./ui
-          file: ./ui/Dockerfile
-          target: production
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/t3-notebook-ui:${{ env.IMAGE_TAG }}
-            ${{ env.ECR_REGISTRY }}/t3-notebook-ui:main-latest
-          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-ui:buildcache
-          cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/t3-notebook-ui:buildcache,mode=max
-          build-args: |
-            VITE_API_URL=/api/v1
+      - name: Capture build metadata
+        id: meta
+        run: echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
       - name: Build and push API image
         uses: docker/build-push-action@v6
@@ -81,6 +70,9 @@ jobs:
           context: ./api
           file: ./api/Dockerfile
           push: true
+          build-args: |
+            GIT_BRANCH=${{ github.ref_name }}
+            BUILD_TIME=${{ steps.meta.outputs.build_time }}
           tags: |
             ${{ env.ECR_REGISTRY }}/t3-notebook-api:${{ env.IMAGE_TAG }}
             ${{ env.ECR_REGISTRY }}/t3-notebook-api:main-latest
@@ -95,9 +87,37 @@ jobs:
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
           terraform -chdir=infra/env/prod apply -auto-approve \
-            -var "ui_image=${ECR_REGISTRY}/t3-notebook-ui:${IMAGE_TAG}" \
             -var "api_image=${ECR_REGISTRY}/t3-notebook-api:${IMAGE_TAG}" \
             -var "deploy_nonce=${GITHUB_SHA}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Build UI
+        working-directory: ./ui
+        run: |
+          CF_DOMAIN=$(terraform -chdir=../infra/env/prod output -raw ui_cloudfront_domain_name)
+          pnpm install --frozen-lockfile
+          VITE_API_BASE_URL="https://${CF_DOMAIN}/api/v1" pnpm build
+
+      - name: Deploy UI to S3
+        run: |
+          UI_BUCKET=$(terraform -chdir=infra/env/prod output -raw ui_bucket_name)
+          aws s3 sync ui/dist/ "s3://${UI_BUCKET}" --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          DISTRIBUTION_ID=$(terraform -chdir=infra/env/prod output -raw ui_cloudfront_distribution_id)
+          aws cloudfront create-invalidation \
+            --distribution-id "${DISTRIBUTION_ID}" \
+            --paths "/*"
 
       - name: Write summary
         run: |
