@@ -25,8 +25,15 @@ It describes:
 | Backend server | `Uvicorn` | ASGI application server |
 | Database | `PostgreSQL` | Durable server-side storage |
 | Local persistence | `IndexedDB` | Browser-side persistent working copy |
-| Reverse proxy | `Nginx` | Local HTTPS and local domain routing |
+| Local reverse proxy | `Nginx` | Local HTTPS and local domain routing |
 | Local orchestration | `Docker Compose` | Local multi-service startup |
+| Production CDN and HTTPS | `AWS CloudFront` | Static UI asset delivery, HTTPS termination, and `/api/*` proxy to ALB |
+| Production API routing | `AWS ALB` | HTTP routing to the API service in ECS Fargate |
+| Production compute | `AWS ECS Fargate` | Backend API container runtime |
+| Production database | `AWS RDS PostgreSQL 16` | Managed PostgreSQL in production and dev environments |
+| Static asset storage | `AWS S3` | Private bucket storing built UI assets served by CloudFront |
+| Infrastructure as code | `Terraform` | AWS resource provisioning and state management |
+| CI/CD | `GitHub Actions` | Automated build, test, and deploy pipeline |
 | DB administration | `pgAdmin` | Local database inspection and administration |
 | Notebook content format | `JSON` | Canonical notebook storage and sync format |
 | Text block format | `Markdown` | Text block content format |
@@ -162,6 +169,22 @@ Local domains:
 - `api.notebook.com`
 - `pgadmin.notebook.com`
 
+## 9a. Production and Staging Hosting
+
+The confirmed cloud hosting stack for `dev` and `prod` environments is:
+
+| Component | AWS Service | Notes |
+|---|---|---|
+| UI static assets | `S3` private bucket | Built by Vite at deploy time; not publicly accessible directly |
+| UI delivery and HTTPS | `CloudFront` distribution | Serves S3 assets; proxies `/api/*` to ALB; terminates TLS |
+| API routing | `Application Load Balancer` | Routes `/api/*` from CloudFront to the API ECS service over HTTP |
+| API compute | `ECS Fargate` | Stateless container; one service per environment |
+| Database | `RDS PostgreSQL 16` | Private subnet; credentials in Secrets Manager |
+| Infrastructure | `Terraform` | State in S3 with DynamoDB locking |
+| CI/CD | `GitHub Actions` | `deploy-main.yml` builds API image and UI assets, applies Terraform, syncs S3, invalidates CloudFront |
+
+The UI and API share the same CloudFront domain. The browser sends all requests (`/` and `/api/*`) to CloudFront over HTTPS. CloudFront routes `/api/*` to the ALB internally over HTTP. Session cookies set by the API are forwarded through CloudFront.
+
 ## 10. Quality and Development Foundation
 
 The confirmed quality and development foundation includes:
@@ -185,7 +208,7 @@ The following technology choices are not fixed in this document yet:
 | Background jobs | no background job layer, `FastAPI BackgroundTasks`, `RQ`, `Dramatiq`, `Celery` | no dedicated job system or `FastAPI BackgroundTasks` for Version 1 |
 | Email provider | `AWS SES`, `Resend`, `Postmark`, `SendGrid`, `Mailgun` | `AWS SES` or `Resend` |
 | LLM provider | `OpenAI`, `Anthropic`, `AWS Bedrock`, `OpenRouter` | one primary provider behind a backend adapter |
-| CI/CD tooling | `GitHub Actions`, Docker image build pipeline, registry-based deploy pipeline, Terraform apply pipeline | `GitHub Actions` as the main CI/CD orchestrator |
+| ~~CI/CD tooling~~ | Decided: `GitHub Actions` + Terraform + ECR + S3 + CloudFront invalidation | See Section 9a |
 
 These decisions should be fixed in later repo-specific architecture documents or ADRs.
 

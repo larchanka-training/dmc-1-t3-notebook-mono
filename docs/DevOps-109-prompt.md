@@ -117,3 +117,88 @@ task:
   Файл `docs/DevOps-109-prompt.md` должен быть на русском!
 ```
 
+
+# Polishing Solution
+
+## Move `ui` to static S3 bucket
+
+```
+role: DevOps engineer
+task:
+  измени terraform конфигурацию чтобы `ui` отдавался со статичного S3 bucket.
+  нужно осуществить переход с использования *Nginx в ECS* на *S3 + CloudFront*.
+
+  что нужно сделать:
+  - создать terraform модуль `infra/modules/static-site` (S3 + CloudFront)
+  - удалить `module "ui_service"` (ECS/Nginx) из `env/dev` и `env/prod`
+  - удалить переменную `ui_image` из `env/dev` и `env/prod` — docker-образ ui больше не нужен
+  - обновить `deploy-main.yml`: заменить сборку docker-образа ui на `pnpm build`,
+    добавить шаги `aws s3 sync` и `aws cloudfront create-invalidation`
+  - обновить документацию: `docs/tech_stack.md`, `CLAUDE.md`
+
+constraints:
+  - S3 bucket должен быть приватным; доступ CloudFront → S3 только через OAC (Origin Access Control)
+  - CloudFront должен быть единой точкой входа для ui И для api:
+      `/*`    → S3 bucket (статика)
+      `/api/*` → ALB (api-сервис) через CloudFront origin (http-only внутри AWS)
+    это необходимо, потому что браузер запрещает mixed content (https ui + http api),
+    а также потому что relative URL `/api/v1` резолвится в CloudFront-домен, а не в ALB
+  - для SPA-роутинга CloudFront должен возвращать `index.html` при ошибках 403 и 404
+  - CloudFront origin для ALB: `origin_protocol_policy = "http-only"`, порт 80
+  - cache behavior для `/api/*`: TTL=0, cookies forward=all (нужно для сессионных куки),
+    allowed_methods включают все HTTP-методы (GET/POST/PUT/DELETE/PATCH/OPTIONS)
+  - VITE_API_BASE_URL (не VITE_API_URL!) должен получать абсолютный HTTPS-адрес:
+    `https://<cloudfront_domain>/api/v1` — именно такую переменную читает `ui/src/shared/api/config.ts`
+  - в GitHub Actions порядок шагов важен:
+    1. сначала `terraform apply` (создаёт CloudFront distribution и ALB)
+    2. затем `terraform output -raw ui_cloudfront_domain_name` → передать в `VITE_API_BASE_URL`
+    3. затем `pnpm build` (bake URL в статику)
+    4. затем `aws s3 sync` + `aws cloudfront create-invalidation`
+  - Node.js в CI должен быть версии 22+, потому что pnpm 11.x требует Node ≥ 22.13
+    (использует встроенный модуль `node:sqlite`, отсутствующий в Node 20)
+  - `preview`-окружение (env/preview) использует ECS+proxy и НЕ меняется в рамках этой задачи
+  - BACKEND_CORS_ORIGINS в api_service должен использовать CloudFront HTTPS-домен:
+    `https://<module.ui.cloudfront_domain_name>`
+```  
+
+
+## Move `api/.env` to AWS secret
+
+### Attempt 1
+```
+role: DevOps engineer
+task:
+  как перенести все значимые параметры из `api/.env` файла в AWS secret?
+  чтобы локально по прежнему использовался `api/.env` файл.
+  в при запуске на AWS эти значения должны читаться из AWS secret.
+  желательно из одного AWS secret, чтобы не пришлось создавать десятки разных AWS secrets.
+```  
+
+
+### Attempt 2
+```
+role: DevOps engineer
+task:
+  нужно перенести все значимые параметры из `api/.env` файла в AWS secret.
+  локально по прежнему будет использоваться `api/.env` файл.
+  `api` приложение должно проверить - если оно запущено под AWS тогда нужно прочитать все параметры из AWS secret.
+
+constraints:
+  - это должен быть один AWS secret, не более
+  - это должен быть именгно AWS secret, никакого дублирования secret в GitHub!
+  - это должен быть plain text ini-file формат, никакого JSON!
+```  
+
+
+### Adjustments
+
+```
+для `api` проекта нужно прочитать .env` параметер `AUTH_DEBUG_MODE`. 
+конвертировать его в boolean и если там `true` - тогда нужно OTP код положить в HTTP headers response для `/api/v1/auth/request-otp` запроса.
+```
+
+
+
+
+
+
