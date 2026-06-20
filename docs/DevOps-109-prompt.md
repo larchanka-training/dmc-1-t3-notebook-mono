@@ -162,7 +162,7 @@ constraints:
 ```  
 
 
-## Move `ui` to static S3 bucket (2)
+## Move `api/.env` to AWS secret
 
 ### Attempt 1
 ```
@@ -188,6 +188,16 @@ constraints:
   - это должен быть именгно AWS secret, никакого дублирования secret в GitHub!
   - это должен быть plain text ini-file формат, никакого JSON!
 ```  
+
+
+### Adjustments
+
+```
+для `api` проекта нужно прочитать .env` параметер `AUTH_DEBUG_MODE`. 
+конвертировать его в boolean и если там `true` - тогда нужно OTP код положить в HTTP headers response для `/api/v1/auth/request-otp` запроса.
+```
+
+
 
 
 
