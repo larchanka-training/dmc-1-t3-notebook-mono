@@ -45,6 +45,14 @@ module "database" {
   tags                    = local.tags
 }
 
+module "ui" {
+  source = "../../modules/static-site"
+
+  name        = "t3-notebook-${var.environment}-ui"
+  bucket_name = "t3-notebook-${var.environment}-ui"
+  tags        = local.tags
+}
+
 module "api_service" {
   source = "../../modules/ecs-service"
 
@@ -65,7 +73,7 @@ module "api_service" {
       environment = {
         ENVIRONMENT          = local.runtime_environment
         LOG_LEVEL            = var.log_level
-        BACKEND_CORS_ORIGINS = "http://${module.alb.alb_dns_name}"
+        BACKEND_CORS_ORIGINS = "https://${module.ui.cloudfront_domain_name}"
         DEPLOY_NONCE         = var.deploy_nonce
       }
       secrets = {
@@ -83,42 +91,6 @@ module "api_service" {
     container_name    = "api"
     container_port    = 8000
     health_check_path = "/api/v1/health"
-  }
-  tags = local.tags
-}
-
-module "ui_service" {
-  source = "../../modules/ecs-service"
-
-  name                       = "t3-notebook-${var.environment}-ui"
-  cluster_arn                = data.terraform_remote_state.shared.outputs.ecs_cluster_arn
-  task_execution_role_arn    = data.terraform_remote_state.shared.outputs.task_execution_role_arn
-  task_role_arn              = data.terraform_remote_state.shared.outputs.ui_task_role_arn
-  cpu                        = 256
-  memory                     = 512
-  desired_count              = 2
-  subnet_ids                 = data.terraform_remote_state.shared.outputs.private_app_subnet_ids
-  vpc_id                     = data.terraform_remote_state.shared.outputs.vpc_id
-  ingress_security_group_ids = [module.alb.security_group_id]
-  container_definitions = [
-    {
-      name  = "ui"
-      image = var.ui_image
-      environment = {
-        DEPLOY_NONCE = var.deploy_nonce
-      }
-      port_mappings = [{
-        container_port = 80
-      }]
-    }
-  ]
-  load_balancer = {
-    listener_arn      = module.alb.listener_arn
-    priority          = 200
-    path_patterns     = ["/*"]
-    container_name    = "ui"
-    container_port    = 80
-    health_check_path = "/"
   }
   tags = local.tags
 }

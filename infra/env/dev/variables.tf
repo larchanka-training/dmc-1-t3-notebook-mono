@@ -28,10 +28,6 @@ variable "environment" {
   default = "dev"
 }
 
-variable "ui_image" {
-  type = string
-}
-
 variable "api_image" {
   type = string
 }
