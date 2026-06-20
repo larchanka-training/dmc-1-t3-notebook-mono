@@ -79,6 +79,8 @@ services:
     build:
       context: ./proxy
       dockerfile: Dockerfile
+    volumes:
+      - ./proxy/certs:/keys:ro
     ports:
       - 8080:8080
       - 8443:8443

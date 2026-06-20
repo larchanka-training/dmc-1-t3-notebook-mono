@@ -226,23 +226,24 @@ Recommended approach:
   - `t3_notebook_prod`
 - preview environments should not create a full RDS instance per PR
 
-Preview database options:
+Preview database approach (implemented):
 
-1. Recommended initial option: one shared preview database instance with one schema or one database per PR if limits remain low.
-2. Alternative for lower complexity: one shared preview database and a naming convention per PR.
+Each preview PR receives its own dedicated RDS PostgreSQL instance (`db.t4g.micro`, Graviton2 ARM). The instance is provisioned automatically by the `modules/rds` Terraform module:
 
-For early delivery, the most practical option is:
+- identifier: `t3-notebook-pr-<number>`
+- database: `notebook`
+- password: auto-generated via `random_password` and stored in Secrets Manager
+- Secrets Manager secret name: `t3-notebook-pr-<number>-connection`
+- ECS task receives `DATABASE_URL` directly from the secret ARN — no manual configuration required
+- instance is destroyed with `terraform destroy` when the PR is closed
 
-- one shared preview PostgreSQL instance
-- one database per preview PR: `t3_notebook_pr_<number>`
+No GitHub Actions secret `PREVIEW_DATABASE_URL_SECRET_ARN` is required.
 
-Reasoning:
+Reasoning for dedicated instance per PR:
 
 - database isolation is clearer than schema-only isolation
-- teardown logic is simpler
+- teardown logic is simpler: `terraform destroy` removes the instance
 - it avoids accidental data overlap between previews
-
-Terraform should create the preview DB entry only if the workflow chooses full preview provisioning. If delivery speed matters more than perfect isolation, preview DB creation can be delegated to an initialization job executed after infrastructure apply.
 
 ## 9. Container Build Strategy
 
@@ -455,7 +456,46 @@ These credentials must belong to `deploy-user`.
 - ECR push and pull for `t3-notebook-ui` and `t3-notebook-api`
 - ECS, ALB, CloudWatch, IAM pass-role, RDS, Secrets Manager or SSM, and networking resources limited to `t3` infrastructure
 
-### 13.3 Follow-up improvement
+### 13.3 ECS Exec access
+
+ECS Exec (`aws ecs execute-command`) is enabled on all ECS services via `enable_execute_command = true` in the `ecs-service` module.
+
+For ECS Exec to work, each task role must have the following permissions:
+
+- `ssmmessages:CreateControlChannel`
+- `ssmmessages:CreateDataChannel`
+- `ssmmessages:OpenControlChannel`
+- `ssmmessages:OpenDataChannel`
+
+These permissions are attached to the `api`, `ui`, and `proxy` task roles via the `ecs-exec` inline policy in `modules/iam`.
+
+To connect interactively to a running container:
+
+```bash
+# Find the task ID
+aws ecs list-tasks \
+  --cluster t3-notebook-cluster \
+  --service-name t3-notebook-prod-api \
+  --query 'taskArns[0]' \
+  --output text
+
+# Open a shell
+aws ecs execute-command \
+  --cluster t3-notebook-cluster \
+  --task <task-arn> \
+  --container api \
+  --interactive \
+  --command "/bin/sh"
+```
+
+Requirements for the operator's own IAM identity:
+
+- `ecs:ExecuteCommand` on the target task resource
+- AWS CLI v2 with the `session-manager-plugin` installed locally
+
+Terraform apply is managed through GitHub Actions (`deploy-main.yml`). Do not run `terraform apply` locally because all Terraform state is stored in the remote S3 backend.
+
+### 13.4 Follow-up improvement
 
 After the first working delivery, migrate GitHub Actions authentication to `GitHub OIDC` if the AWS access model can be updated. This is recommended, but it is not required for the initial rollout because the current constraint already defines static secrets.
 
@@ -566,7 +606,7 @@ Responsibilities:
 
 - run Terraform destroy for the preview state key
 - remove preview routing
-- optionally drop the preview database if it exists
+- destroy the per-PR RDS instance and its Secrets Manager secret
 
 ### 14.5 Main deploy workflow
 
@@ -635,7 +675,8 @@ Per-PR resources:
 - target groups
 - listener rules
 - task definitions
-- optional preview database entry
+- dedicated RDS PostgreSQL instance (`db.t4g.micro`) for the PR
+- Secrets Manager secret with generated `DATABASE_URL`
 - runtime secrets/parameters scoped to the PR
 
 This is more cost-efficient than creating a full isolated network stack per PR, while still giving each preview its own running application containers.

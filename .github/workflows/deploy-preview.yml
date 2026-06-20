@@ -24,7 +24,6 @@ env:
   AWS_ACCOUNT_ID: "867633231218"
   AWS_REGION: eu-north-1
   ECR_REGISTRY: 867633231218.dkr.ecr.eu-north-1.amazonaws.com
-  PREVIEW_DATABASE_URL_SECRET_ARN: REPLACE_WITH_PREVIEW_DATABASE_URL_SECRET_ARN
   TF_STATE_BUCKET: dmc-1-t3-notebook-terraform-state
   TF_LOCK_TABLE: dmc-1-t3-notebook-terraform-lock
   TF_IN_AUTOMATION: "true"
@@ -109,7 +108,6 @@ jobs:
             -var "pr_number=${PR_NUMBER}" \
             -var "ui_image=${ECR_REGISTRY}/t3-notebook-ui:${IMAGE_TAG}" \
             -var "api_image=${ECR_REGISTRY}/t3-notebook-api:${IMAGE_TAG}" \
-            -var "database_url_secret_arn=${PREVIEW_DATABASE_URL_SECRET_ARN}" \
             -var "deploy_nonce=${GITHUB_SHA}"
 
       - name: Write summary

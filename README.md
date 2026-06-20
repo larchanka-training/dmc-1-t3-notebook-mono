@@ -7,6 +7,7 @@
 
 - [AGENTS.md](./AGENTS.md) — bootstrap entry point and execution policy for AI agents (required reading order, source-of-truth precedence, mandatory rules).
 - [CLAUDE.md](./CLAUDE.md) — Claude-specific agent entry point; references `AGENTS.md` for all execution context.
+- [docs/guides/local-development.md](./docs/guides/local-development.md) — актуальная инструкция по локальному запуску: Docker Desktop, submodules, `.env`, hosts и URL сервисов.
 ---
 
 # Зачем это всё нужно
@@ -62,66 +63,43 @@
 
 # Запуск проекта локально
 
-В корне проекта выполните:
+Актуальная последовательность локального запуска вынесена в отдельный документ:
 
-```
+- [docs/guides/local-development.md](./docs/guides/local-development.md)
+
+Короткая версия:
+
+```bash
+git submodule update --init --recursive
+cp ui/.env.example ui/.env
+cp api/.env.example api/.env
 chmod +x start-services.sh
 ./start-services.sh
 ```
 
+После копирования проверьте, что в `ui/.env` указано:
+
+```text
+VITE_API_PROXY_TARGET=http://api:8000
+```
+
 ## Остановка сервисов
 
-Для остановки всех сервисов в корне проекта выполните:
+Для остановки и очистки используйте:
 
-`docker-compose down`
-
----
-
-# Что делает `start-services.sh` (подробное объяснение)
-
-Скрипт автоматизирует весь процесс запуска: поднимает контейнеры Docker, запускает backend и frontend в dev-режиме и подготавливает окружение.
-
-### 1. Останавливает выполнение при любой ошибке
-
-Скрипт завершает работу, если что-то идёт не так. Это защищает от некорректного запуска.
-
-### 2. Запускает docker-compose
-
-Поднимаются все сервисы из `docker-compose.yml`: база данных, API-контейнер, frontend-контейнер, pgAdmin, прокси и т.д.
-
-### 3. Делает паузу
-
-Ждёт некоторое время, чтобы контейнеры успели полностью подняться.
-
-### 4. Запускает backend внутри его контейнера
-
-Скрипт:
-- находит контейнер API,
-- устанавливает Python-зависимости (`pip install`),
-- запускает FastAPI в режиме разработки.
-
-Все команды выполняются **внутри контейнера**, автоматически.
-
-### 5. Запускает frontend внутри его контейнера
-
-Скрипт:
-- находит контейнер фронтенда,
-- устанавливает npm-зависимости,
-- запускает dev-сервер.
-
-Также внутри контейнера и без участия разработчика.
-
-### 6. Выводит сообщение об успешном запуске
-
-Frontend и backend готовы к работе.
+```bash
+./stop-services.sh
+./stop-services.sh cleanup
+./stop-services.sh remove
+```
 
 ---
 
 # Доступные адреса после запуска
 
-- **[https://notebook.com](https://notebook.com/)** — фронтенд
-- **[https://api.notebook.com](https://api.notebook.com/)** — API
-- **[https://pgadmin.notebook.com](https://pgadmin.notebook.com/)** — веб-интерфейс PostgreSQL
+- **[https://notebook.com:8443](https://notebook.com:8443/)** — фронтенд
+- **[https://api.notebook.com:8443](https://api.notebook.com:8443/)** — API
+- **[https://pgadmin.notebook.com:8443](https://pgadmin.notebook.com:8443/)** — веб-интерфейс PostgreSQL
 
 При первом заходе может появиться предупреждение о сертификате — это ожидаемо.
 
@@ -144,7 +122,7 @@ Frontend и backend готовы к работе.
 
 ### Просмотр контейнеров
 
-`docker ps`
+`docker compose ps`
 
 ### Логи сервисов
 
@@ -152,7 +130,7 @@ Frontend и backend готовы к работе.
 
 ### Остановка всех сервисов
 
-`docker compose down`
+`./stop-services.sh`
 
 ### Пересборка
 
@@ -183,5 +161,6 @@ Frontend и backend готовы к работе.
 ### ❗ frontend или backend не запустились
 
 Проверьте:
-- что контейнер найден (имя совпадает с ожидаемым),
-- что зависимости корректно установились.
+- что подтянуты `ui` и `api` submodules,
+- что существуют `ui/.env` и `api/.env`,
+- логи `docker compose logs frontend api proxy`.

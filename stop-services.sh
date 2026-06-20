@@ -3,7 +3,7 @@ set -euo pipefail
 
 mode=$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')
 
-KEEP_IMAGES=("postgres:16" "dpage/pgadmin4")
+KEEP_IMAGES=("postgres:17" "dpage/pgadmin4")
 
 contains_keep_image() {
   local candidate="$1"
@@ -49,7 +49,7 @@ case "$mode" in
   *)
     echo "Stop complete."
     echo "Usage: ./stop-services.sh [cleanup|remove]"
-    echo "  cleanup: down project containers, keep postgres/pgadmin images, remove others"
+    echo "  cleanup: down project containers, keep postgres:17 and pgadmin images, remove others"
     echo "  remove : down project containers and remove all project images/volumes"
     ;;
 esac

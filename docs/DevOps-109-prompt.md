@@ -117,3 +117,14 @@ task:
   Файл `docs/DevOps-109-prompt.md` должен быть на русском!
 ```
 
+
+# Polishing Solution
+
+## Move `ui` to static S3 bucket
+
+```
+role: DevOps engineer
+task:
+  измени terraform конфигурацию чтобы `ui` отдавался со статичного S3 bucket.
+  нужно осуществить переход с использования *Nginx в ECS* на *S3 + CloudFront*.
+```  

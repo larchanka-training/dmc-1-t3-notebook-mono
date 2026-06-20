@@ -1,177 +1,149 @@
-# Reverse-Proxy
+# Local Proxy
 
-## 1. Общая информация
+## 1. Назначение
 
-Проект использует [**Nginx** как **reverse-proxy**](https://github.com/larchanka-training/python-typescript-wiki/blob/5fb06aecf7fa8bc8dbbb1bf0e3e38be20a0e10ca/docker-compose.yaml#L61) для маршрутизации трафика к разным сервисам внутри локальной сети Docker. Reverse-proxy выполняет следующие функции:
+Локальный `proxy` сервис использует `Nginx` как reverse proxy для маршрутизации запросов к сервисам монорепозитория.
 
-- Прокси для приложений и API.
-- Обеспечение SSL шифрования через самоподписанный сертификат.
-- Проброс HTTP заголовков для корректной идентификации клиента.
-- Централизованное управление доступом к сервисам.
+Он нужен для:
 
-Используемые сервисы:
+- локальных доменов `notebook.com`, `api.notebook.com`, `pgadmin.notebook.com`
+- HTTPS в локальной разработке
+- проверки сценариев, завязанных на `Secure` cookies и same-origin поведение
+- более близкой к production схеме доступа через единый входной proxy
 
-|Домен|Прокси на|Порт приложения|
+Текущая локальная схема описана в:
+
+- [docker-compose.yaml](../docker-compose.yaml)
+- [proxy/Dockerfile](../proxy/Dockerfile)
+- [proxy/nginx.conf](../proxy/nginx.conf)
+
+## 2. Как это работает сейчас
+
+В `docker-compose.yaml` сервис `proxy` публикует два локальных порта:
+
+- `8080` для HTTP
+- `8443` для HTTPS
+
+Локальные домены:
+
+| Домен | Проксируется в | Внутренний порт сервиса |
 |---|---|---|
-|`training.wiki`|Frontend-приложение|3000|
-|`api.training.wiki`|API|8000|
-|`pgadmin.training.wiki`|pgAdmin|5050|
+| `notebook.com` | `frontend` | `5173` |
+| `api.notebook.com` | `api` | `8000` |
+| `pgadmin.notebook.com` | `pgadmin` | `80` |
 
----
+Важно: proxy больше не использует `host.docker.internal`.
 
-## 2. [Dockerfile](https://github.com/larchanka-training/python-typescript-wiki/blob/main/proxy/Dockerfile)
+Сейчас маршрутизация идет по внутренним именам Docker Compose сервисов:
 
-Dockerfile создаёт контейнер с Nginx и настраивает SSL:
+- `frontend:5173`
+- `api:8000`
+- `pgadmin:80`
 
-```dockerfile
-FROM nginx:alpine
+Это корректно для текущей конфигурации, потому что все сервисы находятся в одной Compose-сети и Docker сам резолвит их имена.
 
-COPY nginx.conf /etc/nginx/nginx.conf
+## 3. Dockerfile proxy
 
-RUN apk update && apk add bash openssl
+Текущий [proxy/Dockerfile](../proxy/Dockerfile) делает следующее:
 
-RUN mkdir /keys  # Создание директории для ключей
+1. Берет образ `nginx:alpine`
+2. Копирует `nginx.conf` в контейнер
+3. Использует сертификаты, примонтированные в `/keys` из локальной директории `proxy/certs/`
 
-RUN openssl genrsa -out /keys/training.wiki-key.pem 2048  # Генерация приватного ключа
+`proxy` больше не генерирует TLS-сертификаты внутри образа.
 
-RUN openssl req -x509 -new -nodes -batch \ # Генерация самоподписанного сертификата
-	-key /keys/training.wiki-key.pem \
-	-sha256 -days 365 \
-	-subj "/CN=training.wiki" \
-	-out /keys/training.wiki.pem
+## 4. Текущая конфигурация Nginx
 
-```
+В [proxy/nginx.conf](../proxy/nginx.conf):
 
-**Примечания:**
+- определены upstream для `frontend`, `api` и `pgadmin`
+- для каждого локального домена создан отдельный `server`
+- каждый `server` слушает:
+  - `8080`
+  - `8443 ssl`
+- используется один и тот же сертификат:
+  - `/keys/notebook.com.pem`
+  - `/keys/notebook.com-key.pem`
 
-- Используется образ `nginx:alpine` для минимального размера.
-- Устанавливаются утилиты `bash` и `openssl`.
-- Генерируется самоподписанный сертификат для HTTPS (`.pem` и ключ `.key`).
-- Все ключи сохраняются в `/keys`.
-
----
-
-## 3. Конфигурация Nginx ([`nginx.conf`](https://github.com/larchanka-training/python-typescript-wiki/blob/main/proxy/nginx.conf))
-
-### 3.1 Основные параметры
-
-```nginx
-worker_processes 1;
-events { worker_connections 1024; }
-http {
-	sendfile on;
-	include mime.types;`
-```
-
-- `worker_processes` — количество рабочих процессов Nginx (1 для простого проекта).
-- `worker_connections` — максимальное количество соединений на один процесс.
-- `sendfile on;` — ускоряет отдачу статических файлов.
-
----
-
-### 3.2 Upstream сервисы
+Текущие upstream:
 
 ```nginx
 upstream app {
-  server host.docker.internal:3000;
+  server frontend:5173;
 }
+
 upstream api {
-  server host.docker.internal:8000;
+  server api:8000;
 }
+
 upstream pgadmin {
-  server host.docker.internal:5050;
-}
-
-```
-
-- Upstream блоки задают внутренние сервисы, к которым Nginx будет проксировать запросы.
-- `host.docker.internal` используется для доступа к хост-машине из контейнера Docker (тестовая конфигурация для локальной разработки).
-    
-
----
-
-### 3.3 Серверы
-
-#### 3.3.1 Frontend-приложение
-
-```nginx
-server {
-  listen 80;
-  listen 443 ssl;
-  server_name training.wiki;
-
-  ssl_certificate /keys/training.wiki.pem;
-  ssl_certificate_key /keys/training.wiki-key.pem;
-
-  location / {
-      proxy_pass http://app;
-      proxy_redirect     off;
-      proxy_set_header   Host $host;
-      proxy_set_header   X-Real-IP $remote_addr;
-      proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header   X-Forwarded-Host $server_name;
-  }
+  server pgadmin:80;
 }
 ```
 
-#### 3.3.2 API
+## 5. Что именно устарело в старой версии документа
 
-```nginx
-server {
-  listen 80;
-  listen 443 ssl;
-  server_name api.training.wiki;
+Ранее в документе были указаны данные, которые больше не соответствуют проекту:
 
-  ssl_certificate /keys/training.wiki.pem;
-  ssl_certificate_key /keys/training.wiki-key.pem;
+- домены `training.wiki`, `api.training.wiki`, `pgadmin.training.wiki`
+- порты `80/443` вместо текущих `8080/8443`
+- upstream через `host.docker.internal`
+- сертификаты `training.wiki.pem` и `training.wiki-key.pem`
+- ссылки на другой репозиторий
 
-  location / {
-      proxy_pass http://api;
-      proxy_redirect     off;
-      proxy_set_header   Host $host;
-      proxy_set_header   X-Real-IP $remote_addr;
-      proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header   X-Forwarded-Host $server_name;
-  }
-}
+Все это больше не отражает фактическую локальную конфигурацию.
+
+## 6. Что с SSL сейчас
+
+Сейчас ожидаемая dev-схема такая:
+
+- `Nginx` слушает `8443`
+- сертификат заранее создается локально через `mkcert`
+- сертификат и ключ монтируются в контейнер `proxy`
+- браузер устанавливает TLS-соединение
+
+Если `mkcert -install` был выполнен и сертификат выпущен для всех трех доменов, предупреждения браузера быть не должно.
+
+## 7. Рекомендуемая dev-схема сертификатов
+
+В проекте принята схема с одним dev-сертификатом с `SAN`, который покрывает:
+
+- `notebook.com`
+- `api.notebook.com`
+- `pgadmin.notebook.com`
+
+Предпочтительный вариант для команды:
+
+1. Использовать `mkcert`
+2. Один раз установить локальный root CA в систему разработчика
+3. Сгенерировать сертификат сразу для всех трех доменов
+4. Подключать готовые файлы сертификата в `proxy/certs/`
+
+Пример команды:
+
+```bash
+mkcert \
+  -cert-file proxy/certs/notebook.com.pem \
+  -key-file proxy/certs/notebook.com-key.pem \
+  notebook.com api.notebook.com pgadmin.notebook.com
 ```
 
-#### 3.3.3 pgAdmin
+Ожидаемые файлы:
 
-```nginx
-server {
-  listen 80;
-  listen 443 ssl;
-  server_name pgadmin.training.wiki;
+- `proxy/certs/notebook.com.pem`
+- `proxy/certs/notebook.com-key.pem`
 
-  ssl_certificate /keys/training.wiki.pem;
-  ssl_certificate_key /keys/training.wiki-key.pem;
+## 8. Практическая рекомендация
 
-  location / {
-      proxy_pass http://pgadmin;
-      proxy_redirect     off;
-      proxy_set_header   Host $host;
-      proxy_set_header   X-Real-IP $remote_addr;
-      proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header   X-Forwarded-Host $server_name;
-  }
-}
-```
+Практическая схема для команды:
 
-**Общие настройки для всех серверов:**
+1. Один раз выполнить `mkcert -install`
+2. Сгенерировать сертификат в `proxy/certs/`
+3. Не коммитить приватный ключ в репозиторий
+4. Монтировать сертификат и ключ в контейнер `proxy` через `docker-compose.yaml`
 
-- `proxy_pass` — адрес внутреннего сервиса.
-- `proxy_redirect off` — отключает автоматическое изменение Location заголовков.
-- `proxy_set_header` — проброс HTTP-заголовков для идентификации исходного запроса и корректной работы приложений.
+Итог:
 
----
-
-## 4. Особенности работы
-
-1. Контейнер Nginx обслуживает все запросы на порты 80 (HTTP) и 443 (HTTPS) для разных поддоменов.
-2. Все сервисы доступны по поддоменам:
-    - `training.wiki` → frontend
-    - `api.training.wiki` → API
-    - `pgadmin.training.wiki` → pgAdmin
-3. Используется **самоподписанный SSL сертификат**, поэтому браузеры могут выдавать предупреждение при локальном доступе.
-4. Для продакшена рекомендуется заменить сертификат на подписанный CA (например, Let's Encrypt).
+- локальный HTTPS останется
+- warning в браузере исчезнет после доверия к локальному CA
+- все три домена будут покрыты корректно

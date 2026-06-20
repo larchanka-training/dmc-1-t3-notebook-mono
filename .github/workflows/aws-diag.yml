@@ -24,6 +24,10 @@ on:
         description: Optional managed policy ARN to inspect directly
         required: false
         default: ""
+      task_role_name:
+        description: ECS task role name to check ECS Exec (ssmmessages) permissions
+        required: false
+        default: t3-notebook-api-task
 
 permissions:
   contents: read
@@ -37,6 +41,7 @@ env:
   NAMESPACE_NAME: ${{ inputs.namespace_name || 't3-notebook.internal' }}
   DEPLOY_USER: ${{ inputs.deploy_user || 'deploy-user' }}
   MANAGED_POLICY_ARN: ${{ inputs.managed_policy_arn || '' }}
+  TASK_ROLE_NAME: ${{ inputs.task_role_name || 't3-notebook-api-task' }}
 
 jobs:
   aws-diag:
@@ -354,6 +359,73 @@ jobs:
               echo "$simulation_output"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Simulate ECS Exec (ssmmessages) authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          task_role_arn="arn:aws:iam::$account_id:role/$TASK_ROLE_NAME"
+
+          set +e
+          simulation_output=$(aws iam simulate-principal-policy \
+            --policy-source-arn "$task_role_arn" \
+            --action-names \
+              ssmmessages:CreateControlChannel \
+              ssmmessages:CreateDataChannel \
+              ssmmessages:OpenControlChannel \
+              ssmmessages:OpenDataChannel \
+            --resource-arns "*" \
+            --output json 2>&1)
+          simulation_exit_code=$?
+          set -e
+
+          {
+            echo "## ECS Exec IAM simulation"
+            echo ""
+            echo "- Task role ARN: $task_role_arn"
+            echo "- Actions: ssmmessages:CreateControlChannel, CreateDataChannel, OpenControlChannel, OpenDataChannel"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ $simulation_exit_code -eq 0 ]]; then
+            echo "$simulation_output"
+
+            all_allowed=true
+            while IFS= read -r decision; do
+              if [[ "$decision" != "allowed" ]]; then
+                all_allowed=false
+              fi
+            done < <(echo "$simulation_output" | jq -r '.EvaluationResults[].EvalDecision')
+
+            {
+              echo "- simulate-principal-policy: success"
+              echo ""
+              echo "### Simulation results"
+              echo '```json'
+              echo "$simulation_output" | jq '[.EvaluationResults[] | {action: .EvalActionName, decision: .EvalDecision}]'
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [[ "$all_allowed" != "true" ]]; then
+              echo "ECS Exec simulation: one or more ssmmessages actions are not allowed for role $task_role_arn"
+              echo "ECS_EXEC_CHECK_FAILED=true" >> "$GITHUB_ENV"
+            else
+              echo "ECS Exec simulation: all ssmmessages actions allowed for role $task_role_arn"
+              echo "ECS_EXEC_CHECK_FAILED=false" >> "$GITHUB_ENV"
+            fi
+          else
+            echo "$simulation_output"
+            {
+              echo "- simulate-principal-policy: failed"
+              echo ""
+              echo "### simulate-principal-policy stderr"
+              echo '```text'
+              echo "$simulation_output"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "ECS_EXEC_CHECK_FAILED=true" >> "$GITHUB_ENV"
           fi
 
       - name: Fail if Cloud Map tag read is denied
