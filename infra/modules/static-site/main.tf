@@ -23,7 +23,8 @@ resource "aws_cloudfront_origin_access_control" "this" {
 }
 
 locals {
-  s3_origin_id = "s3-${var.bucket_name}"
+  s3_origin_id  = "s3-${var.bucket_name}"
+  alb_origin_id = "alb-api"
 }
 
 resource "aws_cloudfront_distribution" "this" {
@@ -33,8 +34,42 @@ resource "aws_cloudfront_distribution" "this" {
     origin_access_control_id = aws_cloudfront_origin_access_control.this.id
   }
 
+  origin {
+    domain_name = var.api_origin_domain
+    origin_id   = local.alb_origin_id
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
   enabled             = true
   default_root_object = "index.html"
+
+  # /api/* → ALB: no caching, forward everything (auth cookies, headers)
+  ordered_cache_behavior {
+    path_pattern     = "/api/*"
+    allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = local.alb_origin_id
+
+    forwarded_values {
+      query_string = true
+      headers      = ["Accept", "Authorization", "Content-Type", "Origin", "Referer"]
+
+      cookies {
+        forward = "all"
+      }
+    }
+
+    viewer_protocol_policy = "redirect-to-https"
+    min_ttl                = 0
+    default_ttl            = 0
+    max_ttl                = 0
+  }
 
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]

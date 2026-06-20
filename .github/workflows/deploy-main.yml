@@ -96,9 +96,9 @@ jobs:
       - name: Build UI
         working-directory: ./ui
         run: |
-          ALB_DNS=$(terraform -chdir=../infra/env/prod output -raw alb_dns_name)
+          CF_DOMAIN=$(terraform -chdir=../infra/env/prod output -raw ui_cloudfront_domain_name)
           pnpm install --frozen-lockfile
-          VITE_API_BASE_URL="http://${ALB_DNS}/api/v1" pnpm build
+          VITE_API_BASE_URL="https://${CF_DOMAIN}/api/v1" pnpm build
 
       - name: Deploy UI to S3
         run: |

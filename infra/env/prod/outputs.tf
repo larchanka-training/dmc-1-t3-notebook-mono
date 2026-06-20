@@ -14,6 +14,10 @@ output "ui_bucket_name" {
   value = module.ui.bucket_name
 }
 
+output "ui_cloudfront_domain_name" {
+  value = module.ui.cloudfront_domain_name
+}
+
 output "ui_cloudfront_distribution_id" {
   value = module.ui.cloudfront_distribution_id
 }

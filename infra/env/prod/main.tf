@@ -48,9 +48,10 @@ module "database" {
 module "ui" {
   source = "../../modules/static-site"
 
-  name        = "t3-notebook-${var.environment}-ui"
-  bucket_name = "t3-notebook-${var.environment}-ui"
-  tags        = local.tags
+  name              = "t3-notebook-${var.environment}-ui"
+  bucket_name       = "t3-notebook-${var.environment}-ui"
+  api_origin_domain = module.alb.alb_dns_name
+  tags              = local.tags
 }
 
 module "api_service" {
