@@ -66,6 +66,8 @@ jobs:
           context: ./api
           file: ./api/Dockerfile
           push: true
+          build-args: |
+            GIT_BRANCH=${{ github.ref_name }}
           tags: |
             ${{ env.ECR_REGISTRY }}/t3-notebook-api:${{ env.IMAGE_TAG }}
             ${{ env.ECR_REGISTRY }}/t3-notebook-api:main-latest
