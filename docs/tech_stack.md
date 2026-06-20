@@ -32,6 +32,7 @@ It describes:
 | Production compute | `AWS ECS Fargate` | Backend API container runtime |
 | Production database | `AWS RDS PostgreSQL 16` | Managed PostgreSQL in production and dev environments |
 | Static asset storage | `AWS S3` | Private bucket storing built UI assets served by CloudFront |
+| API runtime configuration (production) | `AWS Secrets Manager` | Single ini-format secret injected into the API container at startup via `AWS_APP_SECRET_ARN`; resolved before Pydantic Settings loads the `.env` file |
 | Infrastructure as code | `Terraform` | AWS resource provisioning and state management |
 | CI/CD | `GitHub Actions` | Automated build, test, and deploy pipeline |
 | DB administration | `pgAdmin` | Local database inspection and administration |
@@ -181,6 +182,7 @@ The confirmed cloud hosting stack for `dev` and `prod` environments is:
 | API compute | `ECS Fargate` | Stateless container; one service per environment |
 | Database | `RDS PostgreSQL 16` | Private subnet; credentials in Secrets Manager |
 | Infrastructure | `Terraform` | State in S3 with DynamoDB locking |
+| API runtime secrets | `AWS Secrets Manager` | Single ini-format secret resolved by `AWS_APP_SECRET_ARN` at container startup; absent in local dev where `.env` is used |
 | CI/CD | `GitHub Actions` | `deploy-main.yml` builds API image and UI assets, applies Terraform, syncs S3, invalidates CloudFront |
 
 The UI and API share the same CloudFront domain. The browser sends all requests (`/` and `/api/*`) to CloudFront over HTTPS. CloudFront routes `/api/*` to the ALB internally over HTTP. Session cookies set by the API are forwarded through CloudFront.
