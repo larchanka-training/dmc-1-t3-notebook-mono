@@ -123,12 +123,12 @@ resource "aws_acm_certificate_validation" "alb" {
 module "ui" {
   source = "../../modules/static-site"
 
-  name              = "t3-notebook-${var.environment}-ui"
-  bucket_name       = "t3-notebook-${var.environment}-ui"
-  api_origin_domain = module.alb.alb_dns_name
-  domain_name       = local.root_domain
+  name                = "t3-notebook-${var.environment}-ui"
+  bucket_name         = "t3-notebook-${var.environment}-ui"
+  api_origin_domain   = module.alb.alb_dns_name
+  domain_name         = local.root_domain
   acm_certificate_arn = aws_acm_certificate_validation.cloudfront.certificate_arn
-  tags              = local.tags
+  tags                = local.tags
 }
 
 # Single AWS secret for all API application configuration.
@@ -290,8 +290,8 @@ resource "aws_iam_role_policy" "api_task_secrets" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = ["secretsmanager:GetSecretValue"]
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
         Resource = [aws_secretsmanager_secret.api_config.arn]
       }
     ]
