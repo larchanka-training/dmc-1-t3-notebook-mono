@@ -17,3 +17,8 @@ output "cloudfront_distribution_id" {
   description = "CloudFront distribution ID."
   value       = aws_cloudfront_distribution.this.id
 }
+
+output "cloudfront_hosted_zone_id" {
+  description = "CloudFront hosted zone ID for Route53 alias records."
+  value       = aws_cloudfront_distribution.this.hosted_zone_id
+}

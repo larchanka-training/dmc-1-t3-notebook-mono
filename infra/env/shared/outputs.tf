@@ -66,6 +66,14 @@ output "preview_alb_security_group_id" {
   value = module.preview_alb.security_group_id
 }
 
+output "route53_zone_id" {
+  value = aws_route53_zone.t3_jsnb_org.zone_id
+}
+
+output "route53_name_servers" {
+  value = aws_route53_zone.t3_jsnb_org.name_servers
+}
+
 output "service_discovery_namespace_id" {
   value = aws_service_discovery_private_dns_namespace.preview.id
 }
