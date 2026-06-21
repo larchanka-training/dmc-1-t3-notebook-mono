@@ -236,9 +236,10 @@ resource "aws_lb_listener" "alb_https" {
 }
 
 resource "aws_route53_record" "ui" {
-  zone_id = data.terraform_remote_state.shared.outputs.route53_zone_id
-  name    = local.root_domain
-  type    = "A"
+  zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
+  name            = local.root_domain
+  type            = "A"
+  allow_overwrite = true
 
   alias {
     name                   = module.ui.cloudfront_domain_name
@@ -248,9 +249,10 @@ resource "aws_route53_record" "ui" {
 }
 
 resource "aws_route53_record" "api" {
-  zone_id = data.terraform_remote_state.shared.outputs.route53_zone_id
-  name    = local.api_domain
-  type    = "A"
+  zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
+  name            = local.api_domain
+  type            = "A"
+  allow_overwrite = true
 
   alias {
     name                   = module.alb.alb_dns_name
