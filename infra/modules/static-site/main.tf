@@ -48,6 +48,7 @@ resource "aws_cloudfront_distribution" "this" {
 
   enabled             = true
   default_root_object = "index.html"
+  aliases             = var.domain_name != "" ? [var.domain_name] : []
 
   # /api/* → ALB: no caching, forward everything (auth cookies, headers)
   ordered_cache_behavior {
@@ -110,7 +111,10 @@ resource "aws_cloudfront_distribution" "this" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn            = var.domain_name != "" ? var.acm_certificate_arn : null
+    cloudfront_default_certificate = var.domain_name == ""
+    ssl_support_method             = var.domain_name != "" ? "sni-only" : null
+    minimum_protocol_version       = var.domain_name != "" ? "TLSv1.2_2021" : "TLSv1"
   }
 
   tags = merge(var.tags, {

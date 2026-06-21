@@ -49,6 +49,14 @@ module "preview_alb" {
   tags       = local.tags
 }
 
+resource "aws_route53_zone" "t3_jsnb_org" {
+  name = "t3.jsnb.org"
+
+  tags = merge(local.tags, {
+    Name = "t3.jsnb.org"
+  })
+}
+
 resource "aws_service_discovery_private_dns_namespace" "preview" {
   name = var.cloud_map_namespace_name
   vpc  = module.network.vpc_id

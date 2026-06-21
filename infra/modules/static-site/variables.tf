@@ -13,6 +13,18 @@ variable "api_origin_domain" {
   type        = string
 }
 
+variable "domain_name" {
+  description = "Custom domain for CloudFront (e.g. t3.jsnb.org). If empty, CloudFront default certificate is used."
+  type        = string
+  default     = ""
+}
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN in us-east-1 for the custom domain."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Common resource tags."
   type        = map(string)
