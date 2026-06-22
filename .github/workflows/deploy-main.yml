@@ -103,9 +103,9 @@ jobs:
       - name: Build UI
         working-directory: ./ui
         run: |
-          CF_DOMAIN=$(terraform -chdir=../infra/env/prod output -raw ui_cloudfront_domain_name)
+          API_BASE_URL=$(terraform -chdir=../infra/env/prod output -raw api_base_url)
           pnpm install --frozen-lockfile
-          VITE_API_BASE_URL="https://${CF_DOMAIN}/api/v1" pnpm build
+          VITE_API_BASE_URL="${API_BASE_URL}" pnpm build
 
       - name: Deploy UI to S3
         run: |

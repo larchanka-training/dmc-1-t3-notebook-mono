@@ -8,6 +8,8 @@ data "terraform_remote_state" "shared" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
   runtime_environment = "production"
   root_domain         = var.root_domain
@@ -293,6 +295,23 @@ resource "aws_iam_role_policy" "api_task_secrets" {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
         Resource = [aws_secretsmanager_secret.api_config.arn]
+      }
+    ]
+  })
+}
+
+# Task role: app sends OTP emails via Amazon SES
+resource "aws_iam_role_policy" "api_task_ses" {
+  name = "t3-notebook-${var.environment}-api-task-ses"
+  role = data.terraform_remote_state.shared.outputs.api_task_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ses:SendEmail"]
+        Resource = ["*"]
       }
     ]
   })
