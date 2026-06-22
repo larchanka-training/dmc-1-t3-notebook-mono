@@ -311,12 +311,9 @@ resource "aws_iam_role_policy" "api_task_ses" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = ["ses:SendEmail"]
-        Resource = [
-          "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/noreply@t3.jsnb.org",
-          "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/t3.jsnb.org",
-        ]
+        Effect   = "Allow"
+        Action   = ["ses:SendEmail"]
+        Resource = ["*"]
       }
     ]
   })
