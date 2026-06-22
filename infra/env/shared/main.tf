@@ -107,3 +107,11 @@ resource "aws_route53_record" "ses_inbound_mx" {
   ttl     = 300
   records = ["10 inbound-smtp.us-east-1.amazonaws.com"]
 }
+
+resource "aws_route53_record" "ses_domain_verification" {
+  zone_id = aws_route53_zone.t3_jsnb_org.zone_id
+  name    = "_amazonses.t3.jsnb.org"
+  type    = "TXT"
+  ttl     = 300
+  records = ["3qmSw9KyJKTeT/vVg50WHgdXIXR8C1jh5dw6HMqMMtE="]
+}
