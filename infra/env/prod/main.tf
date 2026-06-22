@@ -165,8 +165,6 @@ resource "aws_secretsmanager_secret_version" "api_config_placeholder" {
     GOOGLE_OAUTH_REDIRECT_URI=https://CHANGE_ME/api/v1/auth/google/callback
     GOOGLE_OAUTH_SUCCESS_REDIRECT_URL=https://CHANGE_ME/
     GOOGLE_OAUTH_ERROR_REDIRECT_URL=https://CHANGE_ME/auth/error
-    SES_FROM_EMAIL=noreply@t3.jsnb.org
-    SES_REGION=eu-north-1
   EOT
 
   lifecycle {
