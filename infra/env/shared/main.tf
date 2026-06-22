@@ -65,3 +65,45 @@ resource "aws_service_discovery_private_dns_namespace" "preview" {
     Name = var.cloud_map_namespace_name
   })
 }
+
+# ---------- Email DNS Records ----------
+
+resource "aws_route53_record" "resend_dkim" {
+  zone_id = aws_route53_zone.t3_jsnb_org.zone_id
+  name    = "resend._domainkey.t3.jsnb.org"
+  type    = "TXT"
+  ttl     = 300
+  records = ["p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDHoq5c9e1p+fTi7uhawg0Uq76gedmztt4TMuZ0714nAD90231Z0t/gwTqptJnIyc0owZx2uVCnaLxGa78sFRCaSeGPJ+uo+WmrEhHVUIw7KQxhZwpcBBbF7KQJX9p932w7Yq94J0VPGfuSWLbyzGgs4EpKOQPn9Nk5k3XLvQDtYQIDAQAB"]
+}
+
+resource "aws_route53_record" "ses_feedback_mx" {
+  zone_id = aws_route53_zone.t3_jsnb_org.zone_id
+  name    = "send.t3.jsnb.org"
+  type    = "MX"
+  ttl     = 300
+  records = ["10 feedback-smtp.us-east-1.amazonses.com"]
+}
+
+resource "aws_route53_record" "ses_spf" {
+  zone_id = aws_route53_zone.t3_jsnb_org.zone_id
+  name    = "send.t3.jsnb.org"
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=spf1 include:amazonses.com ~all"]
+}
+
+resource "aws_route53_record" "dmarc" {
+  zone_id = aws_route53_zone.t3_jsnb_org.zone_id
+  name    = "_dmarc.t3.jsnb.org"
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=DMARC1; p=none;"]
+}
+
+resource "aws_route53_record" "ses_inbound_mx" {
+  zone_id = aws_route53_zone.t3_jsnb_org.zone_id
+  name    = "t3.jsnb.org"
+  type    = "MX"
+  ttl     = 300
+  records = ["10 inbound-smtp.us-east-1.amazonaws.com"]
+}
