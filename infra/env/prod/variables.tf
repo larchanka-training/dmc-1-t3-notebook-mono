@@ -28,6 +28,11 @@ variable "environment" {
   default = "prod"
 }
 
+variable "root_domain" {
+  type    = string
+  default = "t3.jsnb.org"
+}
+
 variable "api_image" {
   type = string
 }

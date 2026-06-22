@@ -10,6 +10,8 @@ data "terraform_remote_state" "shared" {
 
 locals {
   runtime_environment = "production"
+  root_domain         = var.root_domain
+  api_domain          = "api.${var.root_domain}"
   tags = {
     Project     = "dmc-1-t3-notebook"
     Repository  = var.repository
@@ -45,13 +47,88 @@ module "database" {
   tags                    = local.tags
 }
 
+resource "aws_acm_certificate" "cloudfront" {
+  provider                  = aws.us_east_1
+  domain_name               = local.root_domain
+  subject_alternative_names = ["*.${local.root_domain}"]
+  validation_method         = "DNS"
+
+  tags = merge(local.tags, {
+    Name = "${local.root_domain} CloudFront"
+  })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "cert_validation_cloudfront" {
+  for_each = {
+    for dvo in aws_acm_certificate.cloudfront.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
+  name            = each.value.name
+  type            = each.value.type
+  ttl             = 60
+  records         = [each.value.record]
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "cloudfront" {
+  provider                = aws.us_east_1
+  certificate_arn         = aws_acm_certificate.cloudfront.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation_cloudfront : record.fqdn]
+}
+
+resource "aws_acm_certificate" "alb" {
+  domain_name       = local.api_domain
+  validation_method = "DNS"
+
+  tags = merge(local.tags, {
+    Name = "${local.api_domain} ALB"
+  })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "cert_validation_alb" {
+  for_each = {
+    for dvo in aws_acm_certificate.alb.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
+  name            = each.value.name
+  type            = each.value.type
+  ttl             = 60
+  records         = [each.value.record]
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "alb" {
+  certificate_arn         = aws_acm_certificate.alb.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation_alb : record.fqdn]
+}
+
 module "ui" {
   source = "../../modules/static-site"
 
-  name              = "t3-notebook-${var.environment}-ui"
-  bucket_name       = "t3-notebook-${var.environment}-ui"
-  api_origin_domain = module.alb.alb_dns_name
-  tags              = local.tags
+  name                = "t3-notebook-${var.environment}-ui"
+  bucket_name         = "t3-notebook-${var.environment}-ui"
+  api_origin_domain   = module.alb.alb_dns_name
+  domain_name         = local.root_domain
+  acm_certificate_arn = aws_acm_certificate_validation.cloudfront.certificate_arn
+  tags                = local.tags
 }
 
 # Single AWS secret for all API application configuration.
@@ -86,7 +163,6 @@ resource "aws_secretsmanager_secret_version" "api_config_placeholder" {
     GOOGLE_OAUTH_REDIRECT_URI=https://CHANGE_ME/api/v1/auth/google/callback
     GOOGLE_OAUTH_SUCCESS_REDIRECT_URL=https://CHANGE_ME/
     GOOGLE_OAUTH_ERROR_REDIRECT_URL=https://CHANGE_ME/auth/error
-    SES_FROM_EMAIL=CHANGE_ME
   EOT
 
   lifecycle {
@@ -114,7 +190,7 @@ module "api_service" {
       environment = {
         ENVIRONMENT          = local.runtime_environment
         LOG_LEVEL            = var.log_level
-        BACKEND_CORS_ORIGINS = "https://${module.ui.cloudfront_domain_name}"
+        BACKEND_CORS_ORIGINS = "https://${local.root_domain}"
         DEPLOY_NONCE         = var.deploy_nonce
         AWS_DEFAULT_REGION   = var.aws_region
         AWS_APP_SECRET_ARN   = aws_secretsmanager_secret.api_config.arn
@@ -136,6 +212,53 @@ module "api_service" {
     health_check_path = "/api/v1/health"
   }
   tags = local.tags
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_https" {
+  security_group_id = module.alb.security_group_id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+}
+
+resource "aws_lb_listener" "alb_https" {
+  load_balancer_arn = module.alb.alb_arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate_validation.alb.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = module.api_service.target_group_arn
+  }
+}
+
+resource "aws_route53_record" "ui" {
+  zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
+  name            = local.root_domain
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = module.ui.cloudfront_domain_name
+    zone_id                = module.ui.cloudfront_hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "api" {
+  zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
+  name            = local.api_domain
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = module.alb.alb_dns_name
+    zone_id                = module.alb.alb_zone_id
+    evaluate_target_health = true
+  }
 }
 
 # Execution role: pulls DATABASE_URL secret at container start (ECS secrets injection)
@@ -167,25 +290,9 @@ resource "aws_iam_role_policy" "api_task_secrets" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.api_config.arn]
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy" "api_task_ses" {
-  name = "t3-notebook-${var.environment}-api-task-ses"
-  role = data.terraform_remote_state.shared.outputs.api_task_role_name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
         Effect   = "Allow"
-        Action   = ["ses:SendEmail"]
-        Resource = "*"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = [aws_secretsmanager_secret.api_config.arn]
       }
     ]
   })
