@@ -79,6 +79,13 @@ resource "aws_db_instance" "this" {
 resource "aws_secretsmanager_secret" "connection" {
   name = "${var.identifier}-connection"
 
+  dynamic "replica" {
+    for_each = toset(var.secret_replica_regions)
+    content {
+      region = replica.value
+    }
+  }
+
   tags = merge(var.tags, {
     Name = "${var.identifier}-connection"
   })

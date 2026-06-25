@@ -56,3 +56,33 @@ variable "log_level" {
   type    = string
   default = "INFO"
 }
+
+variable "dr_region" {
+  description = "Secondary AWS region for disaster-recovery replication of secrets."
+  type        = string
+  default     = "eu-west-1"
+}
+
+variable "dr_secondary_alb_dns_name" {
+  description = "DR-region ALB DNS name for the API SECONDARY failover record. Empty disables failover routing and keeps a single primary alias (no SERVFAIL risk)."
+  type        = string
+  default     = ""
+}
+
+variable "dr_secondary_alb_zone_id" {
+  description = "DR-region ALB hosted zone ID for the API SECONDARY failover record. Required when dr_secondary_alb_dns_name is set."
+  type        = string
+  default     = ""
+}
+
+variable "ops_alert_email" {
+  description = "Email subscribed to operational SNS alerts (budgets, alarms)."
+  type        = string
+  default     = "ops@t3.jsnb.org"
+}
+
+variable "bedrock_monthly_budget_usd" {
+  description = "Monthly Amazon Bedrock cost budget in USD."
+  type        = number
+  default     = 200
+}
