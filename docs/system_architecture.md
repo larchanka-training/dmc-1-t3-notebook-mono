@@ -376,3 +376,4 @@ By default, the export contains notebook content and notebook metadata, not exec
 - [project.md](./project.md)
 - [projectRU.md](./projectRU.md)
 - [Local-Proxy.md](./Local-Proxy.md)
+- [Disaster Recovery Runbook](./prompts/runbook.md) — AWS DR scenarios: database loss, API outage, region failure, secrets leak, Bedrock budget
