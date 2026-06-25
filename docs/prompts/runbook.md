@@ -404,6 +404,7 @@ These steps must be completed in advance and verified regularly:
 - [ ] **Terraform state accessible from secondary region** — ensure the S3 backend bucket is in a region that is not the same as the primary.
 - [ ] **ECR images replicated** — enable ECR cross-region replication rules for `$SECONDARY_REGION`.
 - [ ] **Secrets Manager secrets replicated** — enable Secrets Manager cross-region replication for the API secret ARN.
+  > **Audit (2026-06-25):** `ReplicationStatus: null` for `t3-notebook-prod/api-config` — cross-region replication is **NOT configured**.
 - [ ] **Route 53 health checks and failover routing** configured for `api.t3.jsnb.org` and the root domain `t3.jsnb.org` pointing to a secondary ALB/CloudFront distribution.
 
 ---
@@ -615,7 +616,7 @@ If OIDC-based federation is used (recommended), no long-lived keys exist — rot
 
 AI code generation uses **AWS Bedrock** as the canonical LLM provider (`AI_PROVIDER_NAME = "bedrock"`, `AI_PROVIDER_MODEL = "anthropic.claude-3-haiku"`). The backend mediates all requests through `POST /api/v1/ai/code-blocks/generate`. Bedrock is billed per-token (input + output). There is no hard Bedrock quota enforced by default — only AWS Budgets and CloudWatch metrics provide alerting.
 
-> **Version 1 status:** the AI gateway is currently a placeholder (`UnavailableAiGenerationGateway` in `api/app/integrations/ai/provider.py`); live Bedrock invocation is not yet wired. The cost controls below must be in place **before** the real gateway is enabled.
+> **Version 1 status:** the application-layer AI gateway is currently a placeholder (`UnavailableAiGenerationGateway` in `api/app/integrations/ai/provider.py`); live Bedrock invocation is not yet wired in code. However, the **IAM access is already provisioned** — the ECS task role `t3-notebook-api-task` has an inline policy `bedrock-deepseek-invoke` that grants `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on `Resource: "*"`. The cost controls below must be in place **before** the real gateway is enabled.
 
 **Risk:** runaway AI requests (from a bug, abuse, or scraper) can generate unexpected costs before the alert fires.
 
@@ -650,6 +651,8 @@ At AWS Bedrock pricing (Anthropic Claude 3 Haiku, as of 2026):
 ### 5.2 Prevention — Configure Budgets and Quotas
 
 These must be configured before going to production:
+
+> **Audit (2026-06-25):** `bedrock-monthly` budget — **NOT created**. `bedrock-invocations-high` CloudWatch alarm — **NOT created**. Both are required before enabling the real Bedrock gateway. Run steps 1 and 2 below immediately.
 
 **1 — AWS Budget alert:**
 
@@ -800,6 +803,18 @@ aws service-quotas request-service-quota-increase \
   --quota-code $QUOTA_CODE \
   --desired-value $NEW_VALUE
 ```
+
+### 5.5 Operator IAM Permissions Required
+
+The following actions must be granted to the on-call operator role for the full runbook to execute. Gaps found during the 2026-06-25 audit:
+
+| Action | Status |
+|---|---|
+| `ecr:DescribeRegistry` | ❌ Not granted — cannot verify ECR cross-region replication |
+| `route53:ListHealthChecks` | ❌ Not granted — cannot verify Route 53 failover health checks |
+| `servicequotas:ListServiceQuotas` | ❌ Not granted — cannot inspect Bedrock quotas |
+
+Add these read-only actions to the on-call IAM policy or the DevOps admin role before the next DR drill.
 
 ---
 
