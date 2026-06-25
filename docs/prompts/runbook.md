@@ -56,10 +56,29 @@
 | DB connection secret | `t3-notebook-prod-db-connection` (JSON) |
 | App config secret | `t3-notebook-prod/api-config` (ini, `AWS_APP_SECRET_ARN`) |
 | ALB | `t3-notebook-prod-alb` |
+| IAM ECS task role | `t3-notebook-api-task` (shared, no `-prod` suffix) |
 
 > The ECS **cluster** is shared across environments and has **no `-prod` suffix** (`t3-notebook-cluster`); only the **service** and task family are environment-scoped (`t3-notebook-prod-api`). `notebook.com` / `api.notebook.com` are **local-development** domains only — production uses `t3.jsnb.org` / `api.t3.jsnb.org`.
 
 > **Open issues:** gaps and fix recommendations identified during the 2026-06-25 live audit are tracked in [runbook_TOFIX_25_06_2026.md](./runbook_TOFIX_25_06_2026.md).
+
+### Incident Session Setup
+
+Run once at the start of any incident to make all CLI commands below copy-paste safe:
+
+```bash
+export AWS_REGION=eu-north-1
+export ECS_CLUSTER=t3-notebook-cluster
+export ECS_SERVICE=t3-notebook-prod-api
+export RDS_ID=t3-notebook-prod-db
+export ALB_NAME=t3-notebook-prod-alb
+export APP_SECRET_ARN=t3-notebook-prod/api-config
+export DB_SECRET_ARN=t3-notebook-prod-db-connection
+export IAM_TASK_ROLE=t3-notebook-api-task
+export LOG_GROUP=/ecs/t3-notebook-prod-api
+export PROD_URL=https://t3.jsnb.org
+export API_URL=https://api.t3.jsnb.org
+```
 
 ---
 
@@ -121,6 +140,10 @@ aws ecs update-service \
   --cluster t3-notebook-cluster \
   --service t3-notebook-prod-api \
   --force-new-deployment
+
+aws ecs wait services-stable \
+  --cluster t3-notebook-cluster \
+  --services t3-notebook-prod-api
 ```
 
 Expected recovery: automatic, no data loss.
@@ -128,6 +151,11 @@ Expected recovery: automatic, no data loss.
 ---
 
 ### 1.3 Accidental Instance Deletion
+
+> ⚠ **Freeze CI/CD before restoring.** If the restore produces a new RDS identifier, an automated `terraform apply` triggered by the next push to `main` will see drift and attempt to destroy the restored instance. Freeze the infra pipeline before proceeding and re-enable only after Terraform state reconciliation (Step 7):
+> ```bash
+> gh workflow disable infra-cloud.yml --repo <ORG>/<MONO-REPO>
+> ```
 
 **Step 1 — Check for final snapshot:**
 
@@ -181,6 +209,10 @@ aws ecs update-service \
   --cluster t3-notebook-cluster \
   --service t3-notebook-prod-api \
   --force-new-deployment
+
+aws ecs wait services-stable \
+  --cluster t3-notebook-cluster \
+  --services t3-notebook-prod-api
 ```
 
 **Step 6 — Run smoke tests:**
@@ -203,6 +235,11 @@ terraform plan   # verify no drift
 ### 1.4 Logical Data Corruption (Point-in-Time Recovery)
 
 RDS automated backups support Point-in-Time Recovery (PITR) within the 14-day retention window.
+
+> ⚠ **Freeze CI/CD before restoring.** The PITR target uses a different identifier (`t3-notebook-prod-db-pitr`). Without freezing the infra pipeline, the next automated `terraform apply` will see drift and destroy the restored instance. Freeze the workflow before proceeding and re-enable only after Terraform state reconciliation.
+> ```bash
+> gh workflow disable infra-cloud.yml --repo <ORG>/<MONO-REPO>
+> ```
 
 ```bash
 # Restore to a point BEFORE corruption, to a NEW instance
@@ -313,6 +350,10 @@ aws ecs update-service \
   --cluster t3-notebook-cluster \
   --service t3-notebook-prod-api \
   --force-new-deployment
+
+aws ecs wait services-stable \
+  --cluster t3-notebook-cluster \
+  --services t3-notebook-prod-api
 ```
 
 ---
@@ -324,6 +365,10 @@ aws ecs update-service \
   --cluster t3-notebook-cluster \
   --service t3-notebook-prod-api \
   --desired-count 2
+
+aws ecs wait services-stable \
+  --cluster t3-notebook-cluster \
+  --services t3-notebook-prod-api
 ```
 
 Verify tasks reach `RUNNING` and ALB targets become healthy before closing the incident.
@@ -533,6 +578,29 @@ aws iam update-access-key \
 
 The API config is a single `ini`-format secret referenced by `AWS_APP_SECRET_ARN`.
 
+**Fast-path — restore AWSPREVIOUS version (when a valid prior version exists):**
+
+If the wrong value was just written and the previous version is known-good, restore it in under 60 seconds without re-entering any credentials:
+
+```bash
+PREV_VID=$(aws secretsmanager describe-secret \
+  --secret-id t3-notebook-prod/api-config \
+  --query 'VersionIdsToStages | to_entries | [?contains(value, `AWSPREVIOUS`)] | [0].key' \
+  --output text)
+CURR_VID=$(aws secretsmanager describe-secret \
+  --secret-id t3-notebook-prod/api-config \
+  --query 'VersionIdsToStages | to_entries | [?contains(value, `AWSCURRENT`)] | [0].key' \
+  --output text)
+# If PREV_VID is a non-empty UUID:
+aws secretsmanager update-secret-version-stage \
+  --secret-id t3-notebook-prod/api-config \
+  --version-stage AWSCURRENT \
+  --move-to-version-id "$PREV_VID" \
+  --remove-from-version-id "$CURR_VID"
+```
+
+**Full rotation — when no valid previous version exists:**
+
 ```bash
 # Generate a new session secret key
 NEW_SESSION_KEY=$(openssl rand -hex 32)
@@ -541,12 +609,20 @@ NEW_SESSION_KEY=$(openssl rand -hex 32)
 aws secretsmanager update-secret \
   --secret-id $AWS_APP_SECRET_ARN \
   --secret-string file://new-secret.ini   # file keeps secret off shell history
+```
 
+**Redeploy (required for both paths):**
+
+```bash
 # Force ECS redeployment to pick up the new secret
 aws ecs update-service \
   --cluster t3-notebook-cluster \
   --service t3-notebook-prod-api \
   --force-new-deployment
+
+aws ecs wait services-stable \
+  --cluster t3-notebook-cluster \
+  --services t3-notebook-prod-api
 
 # All existing HTTP-only session cookies are immediately invalidated
 # Users will be required to re-authenticate
@@ -575,6 +651,10 @@ aws ecs update-service \
   --cluster t3-notebook-cluster \
   --service t3-notebook-prod-api \
   --force-new-deployment
+
+aws ecs wait services-stable \
+  --cluster t3-notebook-cluster \
+  --services t3-notebook-prod-api
 ```
 
 ---
@@ -703,6 +783,38 @@ aws cloudwatch put-metric-alarm \
 
 > Reference: the auth feature already ships a rate limiter (`OTP_REQUEST_RATE_LIMIT` in `api/app/features/auth/rate_limit.py`) — reuse that pattern for the AI endpoint. No AI rate limiting or feature flag exists in the codebase today.
 
+**Alternative near-real-time detection — CloudWatch Logs Metric Filter (no `budgets:*` required):**
+
+A Logs Metric Filter on structured API logs fires before the 24-48h Cost Explorer lag and does not require `budgets:ModifyBudget`. Add to `infra/env/prod` once the AI gateway is wired:
+
+```hcl
+resource "aws_cloudwatch_log_metric_filter" "llm_total_tokens" {
+  name           = "t3-notebook-llm-total-tokens"
+  log_group_name = "/ecs/t3-notebook-prod-api"
+  pattern        = "{ $.event = \"llm.requested\" }"
+  metric_transformation {
+    name      = "LlmTotalTokens"
+    namespace = "T3Notebook/LLM"
+    value     = "$.total_tokens"
+    unit      = "Count"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "llm_token_burst" {
+  alarm_name          = "t3-notebook-llm-token-burst"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "LlmTotalTokens"
+  namespace           = "T3Notebook/LLM"
+  period              = 3600   # 1-hour window
+  statistic           = "Sum"
+  threshold           = 100000 # calibrate after baseline is established
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}
+```
+
+This closes the detection gap documented in TOFIX Issue 2 without requiring `budgets:*` IAM rights (tracked in TOFIX 2026-06-25).
+
 ---
 
 ### 5.3 Incident Response — Budget Threshold Breached
@@ -776,6 +888,10 @@ aws ecs update-service \
   --cluster t3-notebook-cluster \
   --service t3-notebook-prod-api \
   --force-new-deployment
+
+aws ecs wait services-stable \
+  --cluster t3-notebook-cluster \
+  --services t3-notebook-prod-api
 ```
 
 ---
