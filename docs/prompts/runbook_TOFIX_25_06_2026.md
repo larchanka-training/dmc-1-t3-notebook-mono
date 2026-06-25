@@ -59,12 +59,12 @@ Implemented as Terraform. Validated with `terraform fmt -recursive` and `terrafo
 - Wired to `[var.dr_region]` in [infra/env/shared/main.tf](../../infra/env/shared/main.tf). PREFIX_MATCH filter `t3-notebook`.
 
 ### Issue 6 — Route 53 health check + failover
-- `aws_route53_health_check.api` (HTTPS, `/api/v1/health`, 30s interval, 3 failures) and the `api` A/ALIAS record converted to a `PRIMARY` failover record with the health check attached, in [infra/env/prod/main.tf](../../infra/env/prod/main.tf).
+- `aws_route53_health_check.api` (HTTPS, `/api/v1/health`, 30s interval, 3 failures) and PRIMARY/SECONDARY failover records for the `api` domain, in [infra/env/prod/main.tf](../../infra/env/prod/main.tf). Failover is enabled only when a DR-region secondary ALB is provided (`dr_secondary_alb_dns_name`); until then a plain primary alias is published to avoid a `SERVFAIL` DNS blackout on a false-positive health-check flip.
 - Health-check path corrected to `/api/v1/health` to match the actual ALB target-group check (the audit draft used `/api/v1/system/health`).
 
 ### Issue 7 — Operator read-only IAM role
 - `aws_iam_role.operator` (`t3-notebook-operator`) + inline `dr-runbook-readonly` policy granting `ecr:DescribeRegistry`, `route53:ListHealthChecks`, `route53:GetHealthCheck`, `servicequotas:ListServiceQuotas`, `servicequotas:GetServiceQuota`, in [infra/env/shared/main.tf](../../infra/env/shared/main.tf).
-- Assumable by account principals (account root in the trust policy).
+- Trust is scoped to explicit on-call/SSO principal ARNs (`operator_principal_arns`), never the account root; the role is created only when principals are supplied.
 
 ---
 

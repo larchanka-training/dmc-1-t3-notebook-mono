@@ -39,3 +39,9 @@ variable "dr_region" {
   type        = string
   default     = "eu-west-1"
 }
+
+variable "operator_principal_arns" {
+  description = "IAM principal ARNs (e.g. on-call/SSO role ARNs) allowed to assume the DR operator role. Empty disables creation of the role (no account-root trust)."
+  type        = list(string)
+  default     = []
+}

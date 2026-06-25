@@ -63,6 +63,18 @@ variable "dr_region" {
   default     = "eu-west-1"
 }
 
+variable "dr_secondary_alb_dns_name" {
+  description = "DR-region ALB DNS name for the API SECONDARY failover record. Empty disables failover routing and keeps a single primary alias (no SERVFAIL risk)."
+  type        = string
+  default     = ""
+}
+
+variable "dr_secondary_alb_zone_id" {
+  description = "DR-region ALB hosted zone ID for the API SECONDARY failover record. Required when dr_secondary_alb_dns_name is set."
+  type        = string
+  default     = ""
+}
+
 variable "ops_alert_email" {
   description = "Email subscribed to operational SNS alerts (budgets, alarms)."
   type        = string

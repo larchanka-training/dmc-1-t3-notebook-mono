@@ -138,25 +138,32 @@ resource "aws_route53_record" "ses_domain_verification" {
 }
 
 # ---------- Operator / on-call DR role ----------
-# Read-only role assumable by account principals, granting the IAM actions the
-# DR runbook requires for verification (ECR replication, Route 53 health checks,
-# service quotas). See runbook §5.5.
+# Read-only role granting the IAM actions the DR runbook requires (ECR
+# replication, Route 53 health checks, service quotas). See runbook §5.5.
+#
+# Trust is scoped to explicit on-call/SSO principal ARNs (operator_principal_arns)
+# — never the account root, which would let any IAM principal in the account
+# (developers, CI runners, ECS task roles) assume it. When no principals are
+# supplied the role is not created.
 data "aws_caller_identity" "current" {}
 
 data "aws_iam_policy_document" "operator_assume" {
+  count = length(var.operator_principal_arns) > 0 ? 1 : 0
+
   statement {
     actions = ["sts:AssumeRole"]
 
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+      identifiers = var.operator_principal_arns
     }
   }
 }
 
 resource "aws_iam_role" "operator" {
+  count              = length(var.operator_principal_arns) > 0 ? 1 : 0
   name               = "t3-notebook-operator"
-  assume_role_policy = data.aws_iam_policy_document.operator_assume.json
+  assume_role_policy = data.aws_iam_policy_document.operator_assume[0].json
 
   tags = merge(local.tags, {
     Name = "t3-notebook-operator"
@@ -164,8 +171,9 @@ resource "aws_iam_role" "operator" {
 }
 
 resource "aws_iam_role_policy" "operator_dr_readonly" {
-  name = "dr-runbook-readonly"
-  role = aws_iam_role.operator.id
+  count = length(var.operator_principal_arns) > 0 ? 1 : 0
+  name  = "dr-runbook-readonly"
+  role  = aws_iam_role.operator[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"

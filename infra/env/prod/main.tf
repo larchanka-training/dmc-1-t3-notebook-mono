@@ -257,9 +257,21 @@ resource "aws_route53_record" "ui" {
   }
 }
 
-# Route 53 health check on the public API endpoint. Enables failover routing
-# and DR drills (see runbook §3.2). Path matches the ALB target group check.
+# API DNS routing.
+#
+# Failover routing is enabled ONLY when a DR-region secondary ALB is provided
+# (dr_secondary_alb_dns_name). A PRIMARY-only failover record is unsafe: when
+# Route 53 marks the primary unhealthy it has no SECONDARY target and returns
+# SERVFAIL — a full DNS blackout that is worse than a degraded primary. So until
+# the DR stack exists we publish a plain alias record (no health check, no
+# failover), and switch to PRIMARY/SECONDARY failover once the DR ALB is wired.
+locals {
+  enable_api_failover = var.dr_secondary_alb_dns_name != ""
+}
+
+# Health check is only meaningful when failover has a target to fail over to.
 resource "aws_route53_health_check" "api" {
+  count             = local.enable_api_failover ? 1 : 0
   fqdn              = local.api_domain
   port              = 443
   type              = "HTTPS"
@@ -272,13 +284,30 @@ resource "aws_route53_health_check" "api" {
   })
 }
 
+# Default (no DR secondary yet): a single primary alias, no failover policy.
 resource "aws_route53_record" "api" {
+  count           = local.enable_api_failover ? 0 : 1
+  zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
+  name            = local.api_domain
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = module.alb.alb_dns_name
+    zone_id                = module.alb.alb_zone_id
+    evaluate_target_health = true
+  }
+}
+
+# PRIMARY failover record — active only when a SECONDARY target exists.
+resource "aws_route53_record" "api_primary" {
+  count           = local.enable_api_failover ? 1 : 0
   zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
   name            = local.api_domain
   type            = "A"
   allow_overwrite = true
   set_identifier  = "primary"
-  health_check_id = aws_route53_health_check.api.id
+  health_check_id = aws_route53_health_check.api[0].id
 
   failover_routing_policy {
     type = "PRIMARY"
@@ -291,28 +320,32 @@ resource "aws_route53_record" "api" {
   }
 }
 
-# SECONDARY failover record — must be added once the DR-region stack exists.
-# Uncomment and populate alb_dns_name / alb_zone_id from the secondary module.
-# Without this record Route 53 has no target to fail over to when PRIMARY is
-# unhealthy (see runbook §3.3 and review finding).
-#
-# resource "aws_route53_record" "api_secondary" {
-#   zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
-#   name            = local.api_domain
-#   type            = "A"
-#   allow_overwrite = true
-#   set_identifier  = "secondary"
-#
-#   failover_routing_policy {
-#     type = "SECONDARY"
-#   }
-#
-#   alias {
-#     name                   = "<DR_ALB_DNS_NAME>"
-#     zone_id                = "<DR_ALB_ZONE_ID>"
-#     evaluate_target_health = true
-#   }
-# }
+# SECONDARY failover record — DR-region ALB (see runbook §3.3).
+resource "aws_route53_record" "api_secondary" {
+  count           = local.enable_api_failover ? 1 : 0
+  zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
+  name            = local.api_domain
+  type            = "A"
+  allow_overwrite = true
+  set_identifier  = "secondary"
+
+  failover_routing_policy {
+    type = "SECONDARY"
+  }
+
+  alias {
+    name                   = var.dr_secondary_alb_dns_name
+    zone_id                = var.dr_secondary_alb_zone_id
+    evaluate_target_health = true
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.dr_secondary_alb_zone_id != ""
+      error_message = "dr_secondary_alb_zone_id must be set when dr_secondary_alb_dns_name is provided."
+    }
+  }
+}
 
 # Execution role: pulls DATABASE_URL secret at container start (ECS secrets injection)
 resource "aws_iam_role_policy" "task_execution_secrets" {
