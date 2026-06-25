@@ -218,7 +218,7 @@ aws ecs wait services-stable \
 **Step 6 — Run smoke tests:**
 
 ```bash
-curl -sf https://api.t3.jsnb.org/api/v1/system/health
+curl -sf https://api.t3.jsnb.org/api/v1/health
 ```
 
 **Step 7 — Re-apply Terraform to reconcile state:**
@@ -377,11 +377,11 @@ Verify tasks reach `RUNNING` and ALB targets become healthy before closing the i
 
 ### 2.4 ALB Health Check Failure
 
-The health check endpoint is `GET /api/v1/system/health`.
+The health check endpoint is `GET /api/v1/health`.
 
 ```bash
 # Verify the endpoint responds from inside VPC (using a Fargate task with shell access if needed)
-curl -sf http://localhost:8000/api/v1/system/health
+curl -sf http://localhost:8000/api/v1/health
 ```
 
 Check:
@@ -435,7 +435,7 @@ The production environment is deployed in a **single AWS region (`eu-north-1`)**
 open https://health.aws.amazon.com/health/status
 
 # Verify no local network / DNS issue
-curl -sf https://api.t3.jsnb.org/api/v1/system/health
+curl -sf https://api.t3.jsnb.org/api/v1/health
 nslookup api.t3.jsnb.org
 ```
 
@@ -507,7 +507,7 @@ terraform apply -var="aws_region=$SECONDARY_REGION"
 **Step 5 — Verify smoke tests pass in secondary region:**
 
 ```bash
-curl -sf https://api.t3.jsnb.org/api/v1/system/health
+curl -sf https://api.t3.jsnb.org/api/v1/health
 ```
 
 **Step 6 — Communicate status** to users (status page / email).
@@ -836,7 +836,7 @@ aws ce get-cost-and-usage \
 aws logs filter-log-events \
   --log-group-name /ecs/t3-notebook-prod-api \
   --filter-pattern '"POST /api/v1/ai/code-blocks/generate"' \
-  --start-time $(( $(date +%s) - 86400 ))000 \ # portable: Linux & macOS
+  --start-time $(( $(date +%s) - 86400 ))000 \
   --query 'events[*].message' \
   | jq -r '.[]' | wc -l
 ```
