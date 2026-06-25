@@ -200,6 +200,7 @@ Use this checklist for the current live worker session model to verify Stage 6 s
 - **Reliability:** close tab with unsaved local state — notebook content restored after reopen; execution outputs — only after re-run unless cached locally separately.
 - **Accessibility (a11y):** basic roles for Run/Sync buttons, labels on error and conflict indicators.
 - **Security:** see 4.6 and 5.3; when CSP appears — verify no regressions for worker/iframe.
+- **Operational DR:** smoke tests listed in section 8 are the primary post-recovery verification gate; see [Disaster Recovery Runbook](./prompts/runbook.md) for the full AWS recovery playbook (database, API, region, secrets, Bedrock budget).
 
 ---
 
@@ -229,3 +230,4 @@ Use this checklist for the current live worker session model to verify Stage 6 s
 3. Add minimal **smoke suite** to CI: API health + `e2e:smoke` (canary + login → create notebook when UI is ready).
 4. Agree response-time and document-size budgets for performance checks.
 5. Align [Local-Proxy.md](./Local-Proxy.md) with `proxy/nginx.conf` (`notebook.com` domains, ports `8080`/`8443`).
+6. Verify pre-requisites in [Disaster Recovery Runbook §3.2](./prompts/runbook.md#32-pre-requisites-must-be-done-before-an-incident) are actioned before production go-live (cross-region snapshot copies, ECR replication, Route 53 failover routing).

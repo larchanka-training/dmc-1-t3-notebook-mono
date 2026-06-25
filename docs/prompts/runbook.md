@@ -2,7 +2,7 @@
 
 **Project:** dmc-1-t3-notebook-mono  
 **Platform:** AWS (ECS Fargate · RDS PostgreSQL 16 · CloudFront · S3 · ALB · Bedrock)  
-**Last reviewed:** 2026-06-24  
+**Last reviewed:** 2026-06-25  
 **Owner:** DevOps / Platform team
 
 ---
@@ -190,8 +190,9 @@ curl -sf https://api.t3.jsnb.org/api/v1/system/health
 **Step 7 — Re-apply Terraform to reconcile state:**
 
 ```bash
+# The RDS resource lives inside module "database" in infra/env/prod
 cd infra/env/prod
-terraform import aws_db_instance.database $NEW_IDENTIFIER
+terraform import module.database.aws_db_instance.this $NEW_IDENTIFIER
 terraform plan   # verify no drift
 ```
 
@@ -285,7 +286,9 @@ aws ecs describe-tasks \
   --tasks $TASK_ARN \
   --query 'tasks[0].{StopCode:stopCode,StopReason:stoppedReason,Containers:containers[*].{Name:name,Reason:reason,ExitCode:exitCode}}'
 
-# Read CloudWatch logs
+# Extract short task ID from ARN (last segment) and read CloudWatch logs.
+# Log stream format: ecs/<container-name>/<short-task-id>
+TASK_ID=$(echo $TASK_ARN | awk -F/ '{print $NF}')
 aws logs get-log-events \
   --log-group-name /ecs/t3-notebook-prod-api \
   --log-stream-name ecs/api/$TASK_ID \
@@ -430,13 +433,21 @@ aws rds restore-db-instance-from-db-snapshot \
 
 **Step 3 — Provision infrastructure in secondary region via Terraform:**
 
+The repo uses **two independent Terraform root modules**: `infra/env/shared` (network VPC, IAM roles, ECR, ECS cluster) and `infra/env/prod` (ALB, ECS service, RDS, CloudFront). Both must be applied in order.
+
 ```bash
-cd infra/env/prod
-# Create a secondary workspace or copy env folder
+# 3a — Shared layer (VPC, IAM, ECR, ECS cluster)
+cd infra/env/shared
+terraform workspace new dr
+terraform apply -var="aws_region=$SECONDARY_REGION"
+
+# 3b — Prod layer (ALB, ECS service, CloudFront, Route53)
+cd ../prod
 terraform workspace new prod-dr
-terraform apply -var="aws_region=$SECONDARY_REGION" -target=module.network -target=module.alb
 terraform apply -var="aws_region=$SECONDARY_REGION"
 ```
+
+> `-target` flags are intentionally omitted: do a full apply so all resources are provisioned correctly. Per project conventions, `-target` is only an emergency recovery tool, not a standard deployment path (ref: `docs/DevOps-109-specs.md`).
 
 **Step 4 — Update Route 53 to point to secondary ALB/CloudFront:**
 
@@ -708,7 +719,7 @@ aws ce get-cost-and-usage \
 aws logs filter-log-events \
   --log-group-name /ecs/t3-notebook-prod-api \
   --filter-pattern '"POST /api/v1/ai/code-blocks/generate"' \
-  --start-time $(date -d '24 hours ago' +%s000) \
+  --start-time $(( $(date +%s) - 86400 ))000 \ # portable: Linux & macOS
   --query 'events[*].message' \
   | jq -r '.[]' | wc -l
 ```
