@@ -59,6 +59,8 @@
 
 > The ECS **cluster** is shared across environments and has **no `-prod` suffix** (`t3-notebook-cluster`); only the **service** and task family are environment-scoped (`t3-notebook-prod-api`). `notebook.com` / `api.notebook.com` are **local-development** domains only — production uses `t3.jsnb.org` / `api.t3.jsnb.org`.
 
+> **Open issues:** gaps and fix recommendations identified during the 2026-06-25 live audit are tracked in [runbook_TOFIX_25_06_2026.md](./runbook_TOFIX_25_06_2026.md).
+
 ---
 
 ## Scenario 1 — Database Loss
