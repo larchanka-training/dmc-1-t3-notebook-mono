@@ -34,10 +34,10 @@ aws budgets describe-budgets --account-id 867633231218
 
 **Risk:** Bedrock IAM access is already live (`bedrock-deepseek-invoke` policy on `t3-notebook-api-task`). Once the application gateway is wired, runaway or abusive token usage will incur unbounded cost with no alert.
 
-**Fix — run once, substitute real `$AWS_ACCOUNT_ID`:**
+**Fix — run once (account `867633231218`):**
 ```bash
 aws budgets create-budget \
-  --account-id $AWS_ACCOUNT_ID \
+  --account-id 867633231218 \
   --budget '{
     "BudgetName": "bedrock-monthly",
     "BudgetLimit": {"Amount": "200", "Unit": "USD"},
@@ -58,7 +58,7 @@ aws budgets create-budget \
 
 **Verify:**
 ```bash
-aws budgets describe-budgets --account-id $AWS_ACCOUNT_ID \
+aws budgets describe-budgets --account-id 867633231218 \
   --query 'Budgets[?BudgetName==`bedrock-monthly`].{Name:BudgetName,Limit:BudgetLimit.Amount}'
 ```
 
@@ -188,7 +188,7 @@ aws ecr describe-registry --query 'replicationConfiguration'
 aws ecr put-replication-configuration \
   --replication-configuration '{
     "rules": [{
-      "destinations": [{"region": "'"$SECONDARY_REGION"'", "registryId": "'"$AWS_ACCOUNT_ID"'"}],
+      "destinations": [{"region": "'"$SECONDARY_REGION"'", "registryId": "867633231218"}],
       "repositoryFilters": [{"filter": "t3-notebook", "filterType": "PREFIX_MATCH"}]
     }]
   }'
