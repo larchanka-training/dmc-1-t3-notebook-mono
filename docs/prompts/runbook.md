@@ -78,6 +78,8 @@ export IAM_TASK_ROLE=t3-notebook-api-task
 export LOG_GROUP=/ecs/t3-notebook-prod-api
 export PROD_URL=https://t3.jsnb.org
 export API_URL=https://api.t3.jsnb.org
+# Resolved from the authenticated identity (never hardcode the account ID):
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 # Looked up at incident time (depends on ECS service deployment):
 export ALB_TARGET_GROUP_ARN=$(aws elbv2 describe-target-groups \
   --load-balancer-arn $(aws elbv2 describe-load-balancers \

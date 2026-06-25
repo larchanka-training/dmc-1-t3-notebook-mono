@@ -2,7 +2,7 @@
 
 **Audited:** 2026-06-25
 **Resolved:** 2026-06-25
-**Source:** live AWS CLI audit against `t3-notebook-prod` (account `867633231218`, region `eu-north-1`)
+**Source:** live AWS CLI audit against `t3-notebook-prod` (account `$AWS_ACCOUNT_ID`, region `eu-north-1`)
 **Runbook:** [runbook.md](./runbook.md)
 
 All eleven gaps from the 2026-06-25 audit are resolved.
