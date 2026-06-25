@@ -71,6 +71,6 @@ variable "ops_alert_email" {
 
 variable "bedrock_monthly_budget_usd" {
   description = "Monthly Amazon Bedrock cost budget in USD."
-  type        = string
-  default     = "200"
+  type        = number
+  default     = 200
 }

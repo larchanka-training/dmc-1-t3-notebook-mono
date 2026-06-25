@@ -15,12 +15,6 @@ variable "max_image_count" {
   default     = 200
 }
 
-variable "replication_regions" {
-  description = "Destination regions for cross-region image replication."
-  type        = list(string)
-  default     = []
-}
-
 variable "tags" {
   description = "Common tags applied to all repositories."
   type        = map(string)

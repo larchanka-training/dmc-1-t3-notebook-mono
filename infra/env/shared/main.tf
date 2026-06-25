@@ -22,9 +22,29 @@ module "network" {
 module "ecr" {
   source = "../../modules/ecr"
 
-  repositories        = toset(["t3-notebook-ui", "t3-notebook-api"])
-  replication_regions = [var.dr_region]
-  tags                = local.tags
+  repositories = toset(["t3-notebook-ui", "t3-notebook-api"])
+  tags         = local.tags
+}
+
+# ECR cross-region replication is an account-level singleton — managing it here
+# (not inside the ecr module) prevents sibling env applies from overwriting it.
+# See runbook §3.2.
+resource "aws_ecr_replication_configuration" "dr" {
+  count = var.dr_region != "" ? 1 : 0
+
+  replication_configuration {
+    rule {
+      destination {
+        region      = var.dr_region
+        registry_id = data.aws_caller_identity.current.account_id
+      }
+
+      repository_filter {
+        filter      = "t3-notebook"
+        filter_type = "PREFIX_MATCH"
+      }
+    }
+  }
 }
 
 module "iam" {

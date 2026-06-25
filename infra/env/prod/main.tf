@@ -291,6 +291,29 @@ resource "aws_route53_record" "api" {
   }
 }
 
+# SECONDARY failover record — must be added once the DR-region stack exists.
+# Uncomment and populate alb_dns_name / alb_zone_id from the secondary module.
+# Without this record Route 53 has no target to fail over to when PRIMARY is
+# unhealthy (see runbook §3.3 and review finding).
+#
+# resource "aws_route53_record" "api_secondary" {
+#   zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
+#   name            = local.api_domain
+#   type            = "A"
+#   allow_overwrite = true
+#   set_identifier  = "secondary"
+#
+#   failover_routing_policy {
+#     type = "SECONDARY"
+#   }
+#
+#   alias {
+#     name                   = "<DR_ALB_DNS_NAME>"
+#     zone_id                = "<DR_ALB_ZONE_ID>"
+#     evaluate_target_health = true
+#   }
+# }
+
 # Execution role: pulls DATABASE_URL secret at container start (ECS secrets injection)
 resource "aws_iam_role_policy" "task_execution_secrets" {
   name = "t3-notebook-${var.environment}-task-execution-secrets"
@@ -364,7 +387,7 @@ resource "aws_sns_topic_subscription" "alerts_email" {
 resource "aws_budgets_budget" "bedrock_monthly" {
   name         = "bedrock-monthly"
   budget_type  = "COST"
-  limit_amount = var.bedrock_monthly_budget_usd
+  limit_amount = tostring(var.bedrock_monthly_budget_usd)
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
@@ -440,8 +463,13 @@ resource "aws_cloudwatch_metric_alarm" "llm_token_burst" {
 # Supplements the 14-day automated backups with retained weekly snapshots
 # so a known-good restore point always exists.
 resource "aws_backup_vault" "db" {
-  name = "t3-notebook-${var.environment}-db-vault"
-  tags = local.tags
+  name          = "t3-notebook-${var.environment}-db-vault"
+  force_destroy = false
+  tags          = local.tags
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 data "aws_iam_policy_document" "backup_assume" {
