@@ -56,3 +56,21 @@ variable "log_level" {
   type    = string
   default = "INFO"
 }
+
+variable "dr_region" {
+  description = "Secondary AWS region for disaster-recovery replication of secrets."
+  type        = string
+  default     = "eu-west-1"
+}
+
+variable "ops_alert_email" {
+  description = "Email subscribed to operational SNS alerts (budgets, alarms)."
+  type        = string
+  default     = "ops@t3.jsnb.org"
+}
+
+variable "bedrock_monthly_budget_usd" {
+  description = "Monthly Amazon Bedrock cost budget in USD."
+  type        = string
+  default     = "200"
+}

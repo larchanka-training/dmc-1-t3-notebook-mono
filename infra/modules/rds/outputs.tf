@@ -3,6 +3,11 @@ output "endpoint" {
   value       = aws_db_instance.this.address
 }
 
+output "db_instance_arn" {
+  description = "RDS instance ARN."
+  value       = aws_db_instance.this.arn
+}
+
 output "port" {
   description = "RDS port."
   value       = aws_db_instance.this.port

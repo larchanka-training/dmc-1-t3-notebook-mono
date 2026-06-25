@@ -22,8 +22,9 @@ module "network" {
 module "ecr" {
   source = "../../modules/ecr"
 
-  repositories = toset(["t3-notebook-ui", "t3-notebook-api"])
-  tags         = local.tags
+  repositories        = toset(["t3-notebook-ui", "t3-notebook-api"])
+  replication_regions = [var.dr_region]
+  tags                = local.tags
 }
 
 module "iam" {
@@ -114,4 +115,53 @@ resource "aws_route53_record" "ses_domain_verification" {
   type    = "TXT"
   ttl     = 300
   records = ["3qmSw9KyJKTeT/vVg50WHgdXIXR8C1jh5dw6HMqMMtE="]
+}
+
+# ---------- Operator / on-call DR role ----------
+# Read-only role assumable by account principals, granting the IAM actions the
+# DR runbook requires for verification (ECR replication, Route 53 health checks,
+# service quotas). See runbook §5.5.
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "operator_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
+}
+
+resource "aws_iam_role" "operator" {
+  name               = "t3-notebook-operator"
+  assume_role_policy = data.aws_iam_policy_document.operator_assume.json
+
+  tags = merge(local.tags, {
+    Name = "t3-notebook-operator"
+  })
+}
+
+resource "aws_iam_role_policy" "operator_dr_readonly" {
+  name = "dr-runbook-readonly"
+  role = aws_iam_role.operator.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "DRRunbookReadOnly"
+        Effect = "Allow"
+        Action = [
+          "ecr:DescribeRegistry",
+          "route53:ListHealthChecks",
+          "route53:GetHealthCheck",
+          "servicequotas:ListServiceQuotas",
+          "servicequotas:GetServiceQuota",
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }

@@ -46,6 +46,7 @@ module "database" {
   deletion_protection     = true
   skip_final_snapshot     = false
   backup_retention_period = 14
+  secret_replica_regions  = [var.dr_region]
   tags                    = local.tags
 }
 
@@ -142,6 +143,12 @@ resource "aws_secretsmanager_secret" "api_config" {
   name                    = "t3-notebook-${var.environment}/api-config"
   description             = "API application configuration in KEY=VALUE ini format"
   recovery_window_in_days = 7
+
+  # Replicate to the DR region so cold-start ECS tasks can load config
+  # during a primary-region outage (see runbook §3.2).
+  replica {
+    region = var.dr_region
+  }
 
   tags = merge(local.tags, {
     Name = "t3-notebook-${var.environment}/api-config"
@@ -250,11 +257,32 @@ resource "aws_route53_record" "ui" {
   }
 }
 
+# Route 53 health check on the public API endpoint. Enables failover routing
+# and DR drills (see runbook §3.2). Path matches the ALB target group check.
+resource "aws_route53_health_check" "api" {
+  fqdn              = local.api_domain
+  port              = 443
+  type              = "HTTPS"
+  resource_path     = "/api/v1/health"
+  request_interval  = 30
+  failure_threshold = 3
+
+  tags = merge(local.tags, {
+    Name = "${local.api_domain}-health"
+  })
+}
+
 resource "aws_route53_record" "api" {
   zone_id         = data.terraform_remote_state.shared.outputs.route53_zone_id
   name            = local.api_domain
   type            = "A"
   allow_overwrite = true
+  set_identifier  = "primary"
+  health_check_id = aws_route53_health_check.api.id
+
+  failover_routing_policy {
+    type = "PRIMARY"
+  }
 
   alias {
     name                   = module.alb.alb_dns_name
@@ -315,4 +343,153 @@ resource "aws_iam_role_policy" "api_task_ses" {
       }
     ]
   })
+}
+
+# ---------- Operational alerting (SNS) ----------
+resource "aws_sns_topic" "alerts" {
+  name = "t3-notebook-${var.environment}-alerts"
+
+  tags = merge(local.tags, {
+    Name = "t3-notebook-${var.environment}-alerts"
+  })
+}
+
+resource "aws_sns_topic_subscription" "alerts_email" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.ops_alert_email
+}
+
+# ---------- Cost guardrail: Amazon Bedrock monthly budget (runbook §5.2) ----------
+resource "aws_budgets_budget" "bedrock_monthly" {
+  name         = "bedrock-monthly"
+  budget_type  = "COST"
+  limit_amount = var.bedrock_monthly_budget_usd
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
+
+  cost_filter {
+    name   = "Service"
+    values = ["Amazon Bedrock"]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = [var.ops_alert_email]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 100
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "FORECASTED"
+    subscriber_email_addresses = [var.ops_alert_email]
+  }
+}
+
+# ---------- Bedrock invocation rate alarm (runbook §5.2) ----------
+resource "aws_cloudwatch_metric_alarm" "bedrock_invocations_high" {
+  alarm_name          = "bedrock-invocations-high"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Invocations"
+  namespace           = "AWS/Bedrock"
+  period              = 3600
+  statistic           = "Sum"
+  threshold           = 1000
+  alarm_description   = "Bedrock invocations exceeded 1000 in 1h — possible runaway or abusive usage"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+  tags                = local.tags
+}
+
+# Near-real-time detection independent of the AWS/Bedrock namespace,
+# derived from structured API logs (runbook §5.2).
+resource "aws_cloudwatch_log_metric_filter" "llm_total_tokens" {
+  name           = "t3-notebook-${var.environment}-llm-total-tokens"
+  log_group_name = module.api_service.log_group_name
+  pattern        = "{ $.event = \"llm.requested\" }"
+
+  metric_transformation {
+    name      = "LlmTotalTokens"
+    namespace = "T3Notebook/LLM"
+    value     = "$.total_tokens"
+    unit      = "Count"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "llm_token_burst" {
+  alarm_name          = "t3-notebook-${var.environment}-llm-token-burst"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "LlmTotalTokens"
+  namespace           = "T3Notebook/LLM"
+  period              = 3600
+  statistic           = "Sum"
+  threshold           = 100000
+  alarm_description   = "LLM token consumption burst — calibrate threshold after baseline is established"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+  tags                = local.tags
+}
+
+# ---------- Scheduled RDS snapshots (AWS Backup, runbook §1.3) ----------
+# Supplements the 14-day automated backups with retained weekly snapshots
+# so a known-good restore point always exists.
+resource "aws_backup_vault" "db" {
+  name = "t3-notebook-${var.environment}-db-vault"
+  tags = local.tags
+}
+
+data "aws_iam_policy_document" "backup_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["backup.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "backup" {
+  name               = "t3-notebook-${var.environment}-backup"
+  assume_role_policy = data.aws_iam_policy_document.backup_assume.json
+
+  tags = merge(local.tags, {
+    Name = "t3-notebook-${var.environment}-backup"
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "backup" {
+  role       = aws_iam_role.backup.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
+}
+
+resource "aws_backup_plan" "db" {
+  name = "t3-notebook-${var.environment}-db-plan"
+
+  rule {
+    rule_name         = "weekly-snapshot"
+    target_vault_name = aws_backup_vault.db.name
+    schedule          = "cron(0 3 ? * SUN *)" # 03:00 UTC every Sunday
+    start_window      = 60
+    completion_window = 180
+
+    lifecycle {
+      delete_after = 35 # retain 5 weeks
+    }
+  }
+
+  tags = local.tags
+}
+
+resource "aws_backup_selection" "db" {
+  name         = "t3-notebook-${var.environment}-db-selection"
+  iam_role_arn = aws_iam_role.backup.arn
+  plan_id      = aws_backup_plan.db.id
+  resources    = [module.database.db_instance_arn]
 }

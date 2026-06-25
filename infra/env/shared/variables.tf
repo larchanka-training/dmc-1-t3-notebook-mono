@@ -33,3 +33,9 @@ variable "cloud_map_namespace_name" {
   type        = string
   default     = "t3-notebook.internal"
 }
+
+variable "dr_region" {
+  description = "Secondary AWS region used for disaster-recovery replication."
+  type        = string
+  default     = "eu-west-1"
+}
