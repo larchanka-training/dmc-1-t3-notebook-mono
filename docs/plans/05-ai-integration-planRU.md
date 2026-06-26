@@ -266,6 +266,42 @@
 
 **Масштаб:** S
 
+## Task 9: `T3/BTF -> BACK: Добавить multilingual prompt-policy screening для code-generation intent`
+
+**Описание:** Расширить существующую backend-проверку prompt-policy так, чтобы канонический AI-endpoint принимал запросы на code-generation и code-revision, сформулированные не только на английском, но и на поддерживаемых неанглоязычных языках, начиная с русского, при этом по-прежнему отклоняя non-code intent и unsafe prompt-injection attempts до вызова провайдера.
+
+**Критерии приемки:**
+- [ ] Backend prompt screening принимает поддерживаемые русскоязычные code-intent prompts, например запросы создать функцию, компонент, helper или отрефакторить код, без обязательного перевода prompt на клиенте.
+- [ ] Backend prompt screening продолжает отклонять non-code prompts вроде объяснения, суммаризации и general-chat запросов как на английском, так и в поддерживаемых русскоязычных формулировках.
+- [ ] Unsafe prompt-injection и policy-evasion screening покрывает как существующие английские patterns, так и нужные для первого multilingual slice русские эквиваленты.
+- [ ] Public AI endpoint contract остается неизменным: не добавляются новые обязательные request fields, не появляется prompt-language field и не ослабляется правило `context.language: javascript`.
+- [ ] Реализация использует deterministic backend-side screening как основной путь принятия решения и не превращает endpoint неявно в multilingual chat classifier общего назначения.
+- [ ] Automated backend coverage существует как минимум для:
+- [ ] English code-intent pass
+- [ ] Russian code-intent pass
+- [ ] English non-code reject
+- [ ] Russian non-code reject
+- [ ] English unsafe reject
+- [ ] Russian unsafe reject
+
+**Проверка:**
+- [ ] `cd api && .venv/bin/python -m pytest tests/unit/ai -q`
+- [ ] `cd api && .venv/bin/python -m pytest -m integration tests/integration/ai/test_endpoint.py -q`
+- [ ] Ручная проверка контракта подтверждает, что для multilingual support не понадобилось менять shape API payload
+
+**Зависимости:**
+- `T3/BTF -> BACK: Реализовать защищенный backend AI-endpoint и границу провайдера`
+- `T3/BTF -> QA: Подготовить приемочный набор AI-проверок для первого вертикального среза`
+
+**Вероятные файлы или области:**
+- `api/app/features/ai/service.py` или вынесенный helper-модуль для prompt screening
+- `api/tests/unit/ai/`
+- `api/tests/integration/ai/`
+- `docs/ai-test-cases.md`
+- `api/docs/ai_contract.md` и/или `docs/ai-architecture.md`, если потребуется уточнить wording для multilingual policy
+
+**Масштаб:** S
+
 ## Рекомендуемый порядок выполнения
 
 1. `T3/BTF -> RESEARCH: Зафиксировать область Stage 7 и первый поставляемый AI-срез`
@@ -276,6 +312,7 @@
 6. `T3/BTF -> FRONT: Построить детерминированный сборщик контекста и процесс вставки кода`
 7. `T3/BTF -> QA: Подготовить приемочный набор AI-проверок для первого вертикального среза`
 8. `T3/BTF -> DEVOPS: Подготовить приватную AI-конфигурацию и наблюдаемость`
+9. `T3/BTF -> BACK: Добавить multilingual prompt-policy screening для code-generation intent`
 
 ## Контрольные точки
 
@@ -291,6 +328,9 @@
 4. **Контрольная точка 4: Функция проверяема и эксплуатационно понятна**
    Для успешных и ошибочных AI-сценариев есть проверки на backend и в UI, а у команды есть минимальные инструкции по запуску и сопровождению основного backend AI-пути.
 
+5. **Контрольная точка 5: Prompt policy стала multilingual без расширения области endpoint**
+   Backend по-прежнему применяет code-only и unsafe-prompt правила, но поддерживаемые code-intent prompts больше не считаются неявно только англоязычными.
+
 ## Риски и меры снижения
 
 - **Риск:** backend-хранение notebook, локальная рабочая копия или синхронизация еще будут меняться во время старта AI-интеграции.
@@ -304,6 +344,9 @@
 
 - **Риск:** правила проверки запроса, ограничения размера и приведение ошибок будут недостаточно определены и создадут дыры в безопасности или надежности.
   **Мера снижения:** определить ограничения контракта заранее и включить их в backend-тесты и просмотр DevOps-конфигурации.
+
+- **Риск:** prompt policy будет вести себя так, будто endpoint поддерживает только английский, и начнет ложно отклонять валидные code-запросы на поддерживаемых языках команды.
+  **Мера снижения:** добавить явное multilingual prompt-screening coverage как ограниченный backend follow-up без изменения public API contract и без расширения endpoint до general chat.
 
 - **Риск:** QA слишком рано начнет вкладываться в большой каталог запросов до стабилизации первого среза.
   **Мера снижения:** привязать приемочный набор только к реально реализованному поведению и расширять покрытие позже.

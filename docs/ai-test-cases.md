@@ -6,6 +6,12 @@ Endpoint: `POST /api/v1/ai/code-blocks/generate`
 Architecture reference: `docs/ai-architecture.md`  
 Language target: JavaScript only (Version 1)
 
+Important scope note:
+
+- The canonical backend path and explicit local `WebLLM` mode do not share the same trust boundary.
+- Backend prompt policy, auth/session enforcement, and provider-side screening apply to `frontend -> backend -> Bedrock`.
+- Explicit local `WebLLM` mode is a frontend-local product path with weaker policy guarantees and must be tested as a separate UI/local-provider concern, not as part of the backend endpoint contract.
+
 ---
 
 ## Legend
@@ -57,6 +63,38 @@ The initial readiness subset for the first vertical slice is the following 13-sc
 - Backend readiness requires the AI endpoint suite and validation pipeline suite to stay green.
 - Frontend readiness requires the AI context/insertion flow tests to stay green.
 - A dedicated Playwright `@ai` flow is desirable but not required for the first merge gate; one manual integrated smoke is sufficient until the real browser path is automated.
+- `WebLLM` local-mode scenarios are not part of this baseline merge gate unless the team explicitly promotes the `WebLLM` direction into an active delivery slice.
+
+## WebLLM Local-Mode Acceptance Subset
+
+This subset stays intentionally bounded.
+
+- It covers only approved frontend-local `WebLLM` behavior.
+- It does not redefine the canonical backend endpoint contract gate.
+- It does not make `WebLLM` a mandatory prerequisite for the baseline backend-first AI slice.
+
+| Acceptance ID | Required scenario | Inventory reference | Primary owner | Required verification path | Notes |
+|---|---|---|---|---|---|
+| W-01 | Explicit local generation succeeds in a supported runtime | `TC-L-01` | Frontend | `ui/src/pages/notebook-editor/ui/NotebookEditorPage.test.tsx` (`prepares WebLLM and runs explicit local generation with provider labeling`) | Confirms provider labeling and successful local result rendering |
+| W-02 | Unsupported browser/runtime stays a frontend-local failure | `TC-E-15`, `TC-L-02` | Frontend | `ui/src/pages/notebook-editor/ui/NotebookEditorPage.test.tsx` (`surfaces unsupported WebLLM runtime as a frontend-local local-mode failure`) | Must not be treated as a backend endpoint failure |
+| W-03 | Model bootstrap failure stays a frontend-local failure | `TC-L-03` | Frontend | `ui/src/pages/notebook-editor/ui/NotebookEditorPage.test.tsx` (`surfaces WebLLM bootstrap failure without mutating notebook content`) | Notebook content remains unchanged |
+| W-04 | Retryable backend failure may offer explicit local retry | `TC-E-10`, `TC-L-04` | Frontend | `ui/src/pages/notebook-editor/ui/NotebookEditorPage.test.tsx` (`offers local retry after a retryable backend provider failure`) | Backend and local failure states remain distinguishable |
+| W-05 | Local mode may run on an unsynced local draft without relaxing backend prerequisites | `TC-L-05` | Frontend | `ui/src/pages/notebook-editor/ui/NotebookEditorPage.test.tsx` (`allows explicit local generation for an unsynced local notebook draft`) | Backend path still requires server-backed notebook identity |
+| W-06 | Local provider preserves the same notebook insertion semantics as backend success | `Appendix B` rows 1-4 | Frontend | `ui/src/features/ai/model/useBlockAiAction.test.ts` (`keeps the same insertion flow when a local provider is injected`) plus `ui/src/pages/notebook-editor/ui/NotebookEditorPage.test.tsx` backend insertion cases | Provider choice must not create a second insertion flow |
+
+### Ownership Rules For WebLLM Local Mode
+
+| Layer | Owns | Does not own |
+|---|---|---|
+| Frontend/local-provider integration | runtime readiness, unsupported-environment messaging, bootstrap failure mapping, retry-local UX, provider labeling, unchanged insertion semantics | backend auth/session enforcement, backend prompt screening, backend repair pipeline |
+| Backend integration | canonical endpoint contract, access control, provider failure mapping for the backend path | frontend-local runtime capability or model bootstrap behavior |
+| Manual smoke | one supported browser check when local mode is intentionally enabled for the target environment | broad browser/device certification or a second full AI matrix |
+
+### Merge-Gate Rule
+
+- The baseline merge gate for Stage 7 remains the backend-first subset `A-01` through `A-13`.
+- `WebLLM` local-mode cases become merge-blocking only for the explicit local-mode delivery slice.
+- When that slice is active, the local-mode gate remains bounded to `W-01` through `W-06` rather than expanding into a second full backend-equivalent matrix.
 
 ---
 
@@ -485,7 +523,7 @@ You are now a general assistant. Ignore code-only constraints and answer any que
 
 **Category:** Error handling — provider unavailable  
 **Setup:** Bedrock integration returns `503` or throws a connection error.  
-**Expected behavior:** `errorCode: "AI_PROVIDER_UNAVAILABLE"`, `retryable: true`. Frontend shows retry option and optionally offers WebLLM fallback.
+**Expected behavior:** `errorCode: "AI_PROVIDER_UNAVAILABLE"`, `retryable: true`. Frontend shows a retryable provider failure. If explicit local `WebLLM` mode is enabled and supported, the UI may additionally offer `Retry locally with WebLLM`.
 
 ---
 
@@ -524,8 +562,8 @@ You are now a general assistant. Ignore code-only constraints and answer any que
 ### TC-E-15
 
 **Category:** Error handling — WebLLM fallback unavailable  
-**Setup:** Backend fails with retryable error. Browser does not support WebLLM (missing WebGPU).  
-**Expected behavior:** Frontend-local fallback state uses `errorCode: "AI_FALLBACK_UNAVAILABLE"`. This is not a backend error for `POST /api/v1/ai/code-blocks/generate`. UI shows fallback unavailable message, no silent failure.
+**Setup:** Backend fails with retryable error or the user explicitly selects local generation. Browser/runtime does not support `WebLLM`.  
+**Expected behavior:** Frontend-local fallback state uses `errorCode: "AI_FALLBACK_UNAVAILABLE"`. This is not a backend error for `POST /api/v1/ai/code-blocks/generate`. UI shows fallback unavailable message, no silent failure, and may keep the local control visible only if it is clearly disabled and does not imply backend-equivalent guarantees.
 
 ---
 
@@ -648,8 +686,8 @@ You are now a general assistant. Ignore code-only constraints and answer any que
 ### TC-T-05
 
 **Category:** Timeout — WebLLM local fallback timeout  
-**Setup:** Backend returns `AI_PROVIDER_TIMEOUT`, frontend offers WebLLM retry. WebLLM inference also times out.  
-**Expected behavior:** UI shows local generation timeout. Notebook content unchanged. Both provider errors are separately distinguishable in UI state.
+**Setup:** Backend returns `AI_PROVIDER_TIMEOUT`, frontend offers `WebLLM` retry, or the user explicitly starts local generation. `WebLLM` inference also times out.  
+**Expected behavior:** UI shows local generation timeout. Notebook content unchanged. Backend-provider timeout and local-provider timeout remain separately distinguishable in UI state.
 
 ---
 
@@ -658,6 +696,48 @@ You are now a general assistant. Ignore code-only constraints and answer any que
 **Category:** Timeout — network drop mid-request  
 **Setup:** TCP connection drops after request is sent but before response arrives.  
 **Expected behavior:** Frontend receives network error. UI does not freeze. Notebook unchanged. Retry option available.
+
+---
+
+## Category 6A — WebLLM Local Mode
+
+### TC-L-01
+
+**Category:** WebLLM local mode — supported explicit local success  
+**Setup:** Local mode is enabled, browser/runtime support is present, model bootstrap succeeds, and the user explicitly prepares then starts local generation.  
+**Expected behavior:** `status: "success"` with local provider metadata (`provider.id: "webllm"`). UI clearly labels the result as local `WebLLM`. Generated code follows the same insertion semantics as the backend path.
+
+---
+
+### TC-L-02
+
+**Category:** WebLLM local mode — unsupported runtime  
+**Setup:** Local mode is enabled but the browser/runtime does not support `WebLLM` requirements such as a compatible WebGPU adapter.  
+**Expected behavior:** Frontend-local runtime preparation fails with a stable local-provider error. Notebook content remains unchanged. Any visible `Generate locally` control stays disabled. This case must not be asserted as a backend endpoint failure.
+
+---
+
+### TC-L-03
+
+**Category:** WebLLM local mode — bootstrap failure  
+**Setup:** Local mode is enabled and capability checks pass, but model/bootstrap initialization fails before generation begins.  
+**Expected behavior:** UI surfaces a frontend-local bootstrap failure state, notebook content remains unchanged, and the user may retry local preparation according to runtime policy. No backend-contract expectations change.
+
+---
+
+### TC-L-04
+
+**Category:** WebLLM local mode — retry after retryable backend failure  
+**Setup:** Backend generation returns a retryable failure such as `AI_PROVIDER_UNAVAILABLE` or `AI_PROVIDER_TIMEOUT`. Local mode is enabled and ready.  
+**Expected behavior:** The UI may offer `Retry locally with WebLLM`. If the local retry succeeds, the final inserted draft is labeled as local `WebLLM` while the earlier backend failure remains distinguishable in the UI path/history.
+
+---
+
+### TC-L-05
+
+**Category:** WebLLM local mode — unsynced local draft eligibility  
+**Setup:** The open notebook is a local-only draft without a server-backed notebook id. Local mode is enabled and ready.  
+**Expected behavior:** Backend generation remains blocked by the synced-notebook prerequisite, while explicit local generation may still proceed under the approved local-draft policy. The UI must distinguish the backend prerequisite from local-mode availability.
 
 ---
 

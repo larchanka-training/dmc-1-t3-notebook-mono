@@ -61,6 +61,7 @@ The confirmed frontend stack is:
 - `Dexie 4` (IndexedDB local persistence)
 - `Recharts` (charting)
 - `lucide-react` (icons)
+- `WebLLM` via `@mlc-ai/web-llm` (optional, lazy local AI runtime for explicit browser-local mode; rollout remains disabled by default and intended for `dev-opt-in` enablement)
 - `pnpm` (package manager)
 - `Vitest 4` + `React Testing Library` (unit and component tests)
 - `MSW 2` (API mocking in tests)
@@ -150,10 +151,11 @@ The confirmed AI integration choices are:
 
 - AI requests are initiated from the frontend
 - AI provider access goes through the backend
+- the canonical provider path remains backend-mediated; `WebLLM` is an optional explicit browser-local mode
 - AI returns code for a selected notebook block
 - returned AI code becomes normal editable notebook content after insertion
 
-This means the project does not use direct browser-to-provider LLM access in Version 1.
+This means the project does not use direct browser-to-provider LLM access as the default Version 1 path.
 
 ## 9. Local Development Tooling
 

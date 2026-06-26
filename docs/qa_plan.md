@@ -212,6 +212,9 @@ Use this checklist for the current live worker session model to verify Stage 6 s
 - Both login methods (OTP and Google) verified at least in smoke scope.
 - Known limitations documented (self-signed SSL, port `:8443` for local HTTPS).
 - For the first AI vertical slice specifically, the merge gate is the initial acceptance subset in `docs/ai-test-cases.md`, backed by the listed backend/frontend integration suites plus one manual integrated smoke.
+- If explicit local `WebLLM` mode is an active delivery slice, its cases must stay in a separate frontend/local-provider acceptance subset rather than being folded into the backend endpoint contract gate.
+- That local-mode subset is intentionally bounded to supported local success, unsupported runtime, bootstrap failure, retryable backend failure plus local retry, unsynced-local-draft policy, provider labeling, and unchanged insertion semantics.
+- Even when local mode is active, `WebLLM` remains optional and is not a mandatory prerequisite for the baseline backend-first AI slice.
 
 ---
 
