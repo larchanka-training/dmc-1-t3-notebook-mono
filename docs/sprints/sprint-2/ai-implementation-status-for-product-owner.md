@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note explains in simple product terms what has already been implemented from `docs/plans/05-ai-integration-plan.md`, what was intentionally left outside the first slice, and what still must happen before real code generation works end-to-end for users.
+This note explains in simple product terms what has already been implemented from `docs/plans/05-ai-integration-plan.md`, what was intentionally left outside the first slice, and what still must happen before real code generation is considered fully production-ready for users.
 
 The canonical implementation scope for this update is:
 
@@ -29,9 +29,9 @@ The intended Version 1 AI scenario is now defined and wired as:
 
 This is the core product scenario planned in `05-ai-integration-plan.md`.
 
-### 2. The backend AI contract is fixed
+### 2. The backend AI contract is fixed and implemented
 
-The project now has one canonical backend endpoint for AI code generation:
+The project now has one canonical backend endpoint for AI code generation in working backend code:
 
 - `POST /api/v1/ai/code-blocks/generate`
 
@@ -49,7 +49,7 @@ Before calling the real model, the backend now checks:
 
 This matters from a product perspective because AI is not treated like open chat. It is constrained to the notebook code-generation use case.
 
-### 4. Backend code post-processing is implemented
+### 4. Backend code post-processing is implemented and working
 
 The backend does not return raw provider text blindly.
 
@@ -60,7 +60,7 @@ It now handles:
 - bounded repair retry if the first answer is invalid
 - normalized error responses when generation fails
 
-This was one of the hardest parts of the plan and is already covered by tests.
+This was one of the hardest parts of the plan and is already covered by tests and real local smoke verification.
 
 ### 5. Frontend AI interaction inside the notebook is implemented
 
@@ -86,18 +86,42 @@ Supported behavior:
 
 This is important because it keeps the first slice predictable and testable.
 
-### 7. Acceptance coverage for the first slice is defined
+### 7. Acceptance coverage for the first slice is implemented
 
 The project now has a fixed acceptance subset for the first AI vertical slice.
 
-That means the team has already documented:
+That means the team now has both documented and automated coverage for the first slice:
 
 - what scenarios are merge-blocking
 - which cases are covered by backend integration tests
 - which cases are covered by frontend integration tests
 - which checks still remain manual
 
-This prevents the AI scope from turning into an unbounded QA surface.
+This prevents the AI scope from turning into an unbounded QA surface and gives the team a stable merge gate.
+
+### 8. The real Bedrock-backed local smoke path works
+
+This is the biggest status change from the earlier draft.
+
+The team now has a real working local path for:
+
+1. request OTP
+2. verify OTP and create a session cookie
+3. open a server-backed notebook
+4. call the backend AI route
+5. invoke `AWS Bedrock`
+6. receive validated JavaScript code successfully
+
+In other words, this is no longer only mocked wiring or contract-first scaffolding. The backend-to-Bedrock path has been exercised successfully in local development.
+
+### 9. The major local blockers that were found are already fixed
+
+During the integrated smoke, two real implementation issues were discovered and resolved:
+
+- local development OTP flow tried to send through `SES` instead of using the development-safe stub path
+- deterministic JavaScript syntax validation depended on `node --check`, but the backend container image did not include `node`
+
+These issues were not theoretical. They were found through the real integrated flow and fixed in the implementation.
 
 ## What Is Intentionally Outside The First Slice
 
@@ -164,9 +188,9 @@ If the current editor route uses a local working-copy id such as `local-...`, th
 
 So AI is available for a notebook that already exists on the server, including a synced local working copy of that notebook, but not for a purely local unsynced draft.
 
-## What Still Needs To Happen Before Real Code Generation Works
+## What Still Needs To Happen Before The Feature Is Production-Ready
 
-The remaining work is no longer mainly about frontend UX. The main next steps are operational and environment-related.
+The remaining work is no longer mainly about frontend UX or backend feature completeness. The main next steps are environment, release, and production-hardening work.
 
 ### 1. Ensure the AI flow is used with a synced notebook
 
@@ -174,15 +198,15 @@ The real generation path depends on the notebook being present on the backend.
 
 In practical product terms, the user needs a notebook that is already created or synced server-side before AI generation can work.
 
-### 2. Configure the real provider path through `AWS Bedrock`
+### 2. Keep the real provider path through `AWS Bedrock` configured in each target environment
 
 The approved canonical provider path is:
 
 - frontend -> backend -> Bedrock
 
-So the backend runtime still needs the actual provider configuration to be available and working in the target environment.
+The canonical provider path is already implemented and working locally, but the same configuration quality must exist in each target environment.
 
-### 3. Complete backend runtime configuration for Bedrock
+### 3. Complete backend runtime configuration and packaging checks for Bedrock
 
 This includes at minimum:
 
@@ -191,13 +215,13 @@ This includes at minimum:
 - model configuration
 - secure environment variables / secrets handling
 
-Without this, the code path exists in structure but cannot yet perform real generation against the provider.
+Without this, a target environment may still fail even though the application code itself is already correct.
 
-### 4. Verify backend connectivity from the real environment
+### 4. Verify backend connectivity and model access from the real environment
 
 Even if the code is correct, generation will not work unless the backend environment can actually reach Bedrock and has permission to use the selected model.
 
-This is the main practical dependency for moving from “implemented feature foundation” to “real working generation.”
+This is the main practical dependency for moving from “locally working generation” to “environment-ready generation.”
 
 ### 5. Complete the DevOps / operations hardening step
 
@@ -210,9 +234,11 @@ The implementation plan explicitly leaves one final operational step:
 
 This still needs to be finished before the feature should be treated as production-ready.
 
-### 6. Run a real integrated smoke scenario
+### 6. Repeat the integrated smoke in the target deployed environment
 
-Once Bedrock is configured, the team needs one real manual integrated test:
+The team already has one real local integrated smoke result.
+
+The next operational milestone is to repeat the same flow in the target deployed environment:
 
 1. login
 2. open a synced notebook
@@ -222,7 +248,7 @@ Once Bedrock is configured, the team needs one real manual integrated test:
 6. confirm insertion into a `code` block
 7. verify the code remains editable and executable
 
-This will confirm the full real path works, not just mocked or isolated pieces.
+This will confirm the full real path works in the intended hosted environment, not only in local development.
 
 ### 7. Add browser-level AI E2E automation after the real path is stable
 
@@ -230,7 +256,7 @@ Once the real provider path works reliably, the next logical QA step is a Playwr
 
 ## Product Summary
 
-The AI feature is already implemented as a real first slice, but not yet fully operational in a real environment.
+The AI feature is already implemented as a real first slice and already works end-to-end in local development against the real Bedrock-backed backend path. It should no longer be described as only partial wiring or only architectural preparation.
 
 What exists today:
 
@@ -239,19 +265,20 @@ What exists today:
 - validation and repair pipeline
 - insertion logic
 - automated acceptance coverage for the first slice
+- real local Bedrock-backed smoke success
 
-What still blocks real generation:
+What still blocks full production readiness:
 
-- synced notebook requirement in real usage
-- real Bedrock configuration
-- runtime and DevOps setup
-- final integrated smoke on a real environment
+- synced notebook requirement for real usage remains intentional product behavior
+- target-environment Bedrock configuration and IAM access
+- runtime and DevOps hardening in deployed environments
+- final integrated smoke in the real hosted environment
 
 ## Recommended Next Product Step
 
-The most useful next step is not new UI work.
+The most useful next step is still not new UI work.
 
-It is to finish the real backend runtime path for Bedrock and validate one real synced-notebook generation flow end-to-end.
+It is to finish production-environment runtime hardening and validate one real synced-notebook generation flow in the hosted target environment.
 
 After that, the team can:
 

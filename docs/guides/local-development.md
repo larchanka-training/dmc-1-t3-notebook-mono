@@ -6,6 +6,7 @@
 
 - [bedrock-runtime-smoke.md](./bedrock-runtime-smoke.md) — AWS Console checklist для Bedrock runtime, ECS role/secret wiring и manual AI smoke
 - [bedrock-runtime-smokeRU.md](./bedrock-runtime-smokeRU.md) — тот же Bedrock runtime smoke guide на русском для командного использования
+- [webllm-local-mode-smokeRU.md](./webllm-local-mode-smokeRU.md) — локальная проверка explicit `WebLLM` mode, rollout guards и retry-local UX
 
 ## Что нужно заранее
 

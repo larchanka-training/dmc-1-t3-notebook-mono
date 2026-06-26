@@ -265,6 +265,42 @@ Implement the Version 1 AI-assisted notebook workflow so a user can generate val
 
 **Scope:** S
 
+## Task 9: `T3/BTF -> BACK: Add multilingual prompt-policy screening for code-generation intent`
+
+**Description:** Extend the existing backend prompt-policy screening so the canonical AI endpoint accepts code-generation and code-revision requests expressed in supported non-English languages, starting with Russian, while still rejecting non-code intent and unsafe prompt-injection attempts before provider invocation.
+
+**Acceptance criteria:**
+- [ ] Backend prompt screening accepts supported Russian code-intent prompts such as requests to create a function, component, helper, or refactor code, without requiring prompt translation on the client.
+- [ ] Backend prompt screening continues to reject non-code prompts such as explanation, summarization, and general-chat requests in both English and supported Russian phrasing.
+- [ ] Unsafe prompt-injection and policy-evasion screening covers both existing English patterns and the supported Russian equivalents needed for the first multilingual slice.
+- [ ] The public AI endpoint contract remains unchanged: no new required request fields, no prompt-language field, and no relaxation of the `context.language: javascript` rule.
+- [ ] The implementation uses deterministic backend-side screening as the primary decision path and does not silently turn the endpoint into a general multilingual chat classifier.
+- [ ] Automated backend coverage exists for at least:
+- [ ] English code-intent pass
+- [ ] Russian code-intent pass
+- [ ] English non-code reject
+- [ ] Russian non-code reject
+- [ ] English unsafe reject
+- [ ] Russian unsafe reject
+
+**Verification:**
+- [ ] `cd api && .venv/bin/python -m pytest tests/unit/ai -q`
+- [ ] `cd api && .venv/bin/python -m pytest -m integration tests/integration/ai/test_endpoint.py -q`
+- [ ] Manual contract review confirms no API payload shape changes were introduced for multilingual support
+
+**Dependencies:**
+- `T3/BTF -> BACK: Implement the authenticated backend AI endpoint and provider boundary`
+- `T3/BTF -> QA: Build the AI acceptance suite for the first vertical slice`
+
+**Likely files or areas:**
+- `api/app/features/ai/service.py` or extracted prompt-screening helper module
+- `api/tests/unit/ai/`
+- `api/tests/integration/ai/`
+- `docs/ai-test-cases.md`
+- `api/docs/ai_contract.md` and/or `docs/ai-architecture.md` if multilingual policy wording needs clarification
+
+**Scope:** S
+
 ## Recommended Execution Order
 
 1. `T3/BTF -> RESEARCH: Fix the Stage 7 AI scope and first delivery slice`
@@ -275,6 +311,7 @@ Implement the Version 1 AI-assisted notebook workflow so a user can generate val
 6. `T3/BTF -> FRONT: Build the deterministic context builder and code insertion flow`
 7. `T3/BTF -> QA: Build the AI acceptance suite for the first vertical slice`
 8. `T3/BTF -> DEVOPS: Prepare private AI runtime configuration and observability`
+9. `T3/BTF -> BACK: Add multilingual prompt-policy screening for code-generation intent`
 
 ## Checkpoints
 
@@ -290,6 +327,9 @@ Implement the Version 1 AI-assisted notebook workflow so a user can generate val
 4. **Checkpoint 4: The feature is testable and operable**
    AI happy-path and failure-path checks exist across backend and UI layers, and the team has minimal operational guidance for running the canonical backend AI path.
 
+5. **Checkpoint 5: Prompt policy is multilingual without expanding endpoint scope**
+   The backend continues to enforce code-only and unsafe-prompt rules, but supported code-intent prompts are no longer implicitly English-only.
+
 ## Risks and Mitigations
 
 - **Risk:** notebook persistence, local-first persistence, or sync contracts may still be moving while AI integration starts.
@@ -303,6 +343,9 @@ Implement the Version 1 AI-assisted notebook workflow so a user can generate val
 
 - **Risk:** prompt screening, request sizing, and error mapping could be under-specified and create security or reliability gaps.
   **Mitigation:** define contract constraints early and include them in backend tests and DevOps configuration review.
+
+- **Risk:** prompt policy may behave as if the endpoint is English-only, causing false rejections for valid code requests in supported team languages.
+  **Mitigation:** add explicit multilingual prompt-screening coverage as a bounded backend follow-up without changing the public API contract or broadening the endpoint into general chat.
 
 - **Risk:** QA could overinvest in broad prompt catalogs before the implemented slice is stable.
   **Mitigation:** tie the acceptance suite only to implemented feature behavior and expand prompt coverage later.
