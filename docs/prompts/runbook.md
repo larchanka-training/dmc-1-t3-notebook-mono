@@ -703,7 +703,7 @@ If OIDC-based federation is used (recommended), no long-lived keys exist — rot
 
 ### Context
 
-AI code generation uses **AWS Bedrock** as the canonical LLM provider (`AI_PROVIDER_NAME = "bedrock"`, `AI_PROVIDER_MODEL = "anthropic.claude-3-haiku"`). The backend mediates all requests through `POST /api/v1/ai/code-blocks/generate`. Bedrock is billed per-token (input + output). There is no hard Bedrock quota enforced by default — only AWS Budgets and CloudWatch metrics provide alerting.
+AI code generation uses **AWS Bedrock** as the canonical LLM provider (`AI_PROVIDER_NAME = "bedrock"`, `AI_PROVIDER_MODEL = "deepseek.v3.2"`). The backend mediates all requests through `POST /api/v1/ai/code-blocks/generate`. Bedrock is billed per-token (input + output). There is no hard Bedrock quota enforced by default — only AWS Budgets and CloudWatch metrics provide alerting.
 
 > **Version 1 status:** the application-layer AI gateway is currently a placeholder (`UnavailableAiGenerationGateway` in `api/app/integrations/ai/provider.py`); live Bedrock invocation is not yet wired in code. However, the **IAM access is already provisioned** — the ECS task role `t3-notebook-api-task` has an inline policy `bedrock-deepseek-invoke` that grants `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on `Resource: "*"`. The cost controls below must be in place **before** the real gateway is enabled.
 

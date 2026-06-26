@@ -137,7 +137,7 @@ Check that the secret contains the expected runtime settings, for example:
 ```ini
 AI_PROVIDER_ENABLED=true
 AI_PROVIDER_NAME=bedrock
-AI_PROVIDER_MODEL=anthropic.claude-3-haiku
+AI_PROVIDER_MODEL=deepseek.v3.2
 AI_BEDROCK_REGION=eu-north-1
 AI_BEDROCK_TIMEOUT_SECONDS=20
 AI_BEDROCK_MAX_RETRIES=1
