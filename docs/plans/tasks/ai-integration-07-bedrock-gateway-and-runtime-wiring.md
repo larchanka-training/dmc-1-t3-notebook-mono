@@ -2,7 +2,7 @@
 
 ## Status
 
-- `planned`
+- `done`
 
 ## Цель
 
@@ -128,3 +128,17 @@
 - после выполнения обновить `Status` на `done` или `blocked`
 - если реализация потребовала уточнить provider-related config contract или error semantics, зафиксировать это в `api/docs/ai_contract.md`
 - если verification достигнута через equivalent provider-mock suites и один manual smoke against real runtime, явно отметить это в notes
+
+### Implementation notes
+
+- Добавлен `BedrockAiGenerationGateway`, который маппит `AiProviderGenerateRequest` в `bedrock-runtime.converse` вызов и нормализует text response обратно в `AiProviderGenerateResponse`.
+- `get_ai_generation_gateway()` теперь выбирает реальный Bedrock gateway только при полной runtime config; при disabled/incomplete config и при отсутствии `boto3` в runtime сохраняется controlled `UnavailableAiGenerationGateway`.
+- Добавлены backend settings для Bedrock runtime: enable flag, region, timeout и retries; `api/.env.example` обновлён под новый runtime contract.
+- Добавлены unit tests на success mapping, timeout/unavailable/malformed mapping, repair-attempt request mapping и dependency selection; existing integration suites подтверждают совместимость repair retry path с новым wiring.
+
+### Verification notes
+
+- Выполнено: `cd api && .venv/bin/python -m pytest tests/unit -q`
+- Выполнено: `cd api && .venv/bin/python -m pytest -m integration tests/integration/ai/test_endpoint.py tests/integration/ai/test_validation_pipeline.py -q`
+- Дополнительно выполнено: `cd api && .venv/bin/python -m pytest tests/unit/ai -q`
+- Real Bedrock manual smoke не выполнялся: в текущем `api/.venv` отсутствует установленный `boto3`, поэтому runtime path в этом окружении предсказуемо деградирует в controlled unavailable до установки SDK и валидной AWS config.

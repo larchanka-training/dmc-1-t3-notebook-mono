@@ -25,8 +25,13 @@ services:
       - "8000:8000"
     volumes:
       - ./api:/app
+      - ${HOME}/.aws:/home/appuser/.aws:ro
     env_file:
       - ./api/.env
+    environment:
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SDK_LOAD_CONFIG: "1"
+      AWS_EC2_METADATA_DISABLED: "true"
     depends_on:
       postgres:
         condition: service_healthy
