@@ -84,7 +84,7 @@ POST /api/v1/ai/code-blocks/generate
   "status": "success",
   "code": "...",
   "provider": "bedrock",
-  "model": "anthropic.claude-3-haiku",
+  "model": "deepseek.v3.2",
   "warnings": [],
   "validation": {
     "extractionApplied": true,

@@ -353,7 +353,7 @@ Illustrative success response:
   "code": "function parseTaxes(csvText) {\\n  return [];\\n}",
   "provider": {
     "name": "bedrock",
-    "model": "anthropic.claude-3-haiku"
+    "model": "deepseek.v3.2"
   },
   "validation": {
     "extractionApplied": true,
