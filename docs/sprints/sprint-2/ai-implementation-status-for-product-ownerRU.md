@@ -160,7 +160,9 @@ Backend AI flow завязан на реальную server-side notebook identi
 
 Если текущий notebook существует только локально и ещё не синхронизирован с backend, frontend блокирует запрос ещё до вызова AI endpoint.
 
-То есть сейчас AI доступен только для notebook, который уже существует на сервере, а не для чисто локального unsynced draft.
+Если editor route использует local working-copy id вроде `local-...`, само по себе это не является блокером. Synced local working copy всё равно может вызывать AI, если sync metadata содержит реальный server-backed notebook id.
+
+То есть сейчас AI доступен для notebook, который уже существует на сервере, включая synced local working copy этого notebook, но не для чисто локального unsynced draft.
 
 ## Что ещё нужно сделать, чтобы заработала реальная генерация кода
 

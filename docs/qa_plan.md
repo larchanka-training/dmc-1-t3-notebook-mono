@@ -109,7 +109,7 @@ The first AI vertical slice uses a narrow acceptance gate aligned with the testi
 
 - **Backend integration is merge-blocking** for auth/session gate, notebook access gate, prompt-policy rejection, provider failure mapping, extraction failure, syntax-invalid final failure, and repair-retry success.
 - **Frontend integration is merge-blocking** for deterministic context assembly (`scope: this`, `scope: notebook`), local-notebook blocking before request dispatch, prompt preservation, and insertion into an existing empty `code` block or a newly created `code` block.
-- **Manual integrated smoke is release-blocking but not per-merge blocking** until a dedicated Playwright `@ai` scenario exists. The required smoke is: open a synced notebook, generate code from a source `text` block, confirm insertion below the source block, and verify the inserted code remains editable and executable.
+- **Manual integrated smoke is release-blocking but not per-merge blocking** until a dedicated Playwright `@ai` scenario exists. The required smoke is: confirm `GET /api/v1/system/health` reports safe AI readiness for the target environment, open a synced notebook, generate code from a source `text` block, confirm insertion below the source block, and verify the inserted code remains editable and executable.
 
 Current first-slice suites:
 

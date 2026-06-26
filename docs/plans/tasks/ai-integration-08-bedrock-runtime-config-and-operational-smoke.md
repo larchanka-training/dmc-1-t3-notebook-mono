@@ -2,7 +2,7 @@
 
 ## Status
 
-- `planned`
+- `done`
 
 ## Цель
 
@@ -131,3 +131,24 @@
 - если в ходе работы выбрана другая Bedrock model, кратко зафиксировать причину
 - если operational smoke потребовал уточнить acceptance subset или runtime constraints, отразить это в `docs/qa_plan.md` и/или `docs/ai-architecture.md`
 - если verification была достигнута на staging-like environment, явно указать это в notes
+
+### Implementation notes
+
+- Исправлен packaging/runtime gap: `boto3` добавлен в `api/pyproject.toml`, чтобы editable install и dev/test venv действительно содержали Bedrock SDK, а backend не деградировал в `sdk-unavailable` только из-за неполной package metadata.
+- Добавлен безопасный AI runtime readiness summary в `GET /api/v1/system/health`:
+  - `provider`
+  - `configured`
+  - `ready`
+  - `reason`
+  - `missing_fields`
+- Добавлены backend AI service logs с `request_id` correlation и явным различением timeout / unavailable / invalid-response классов без логирования prompt, notebook context или secret values.
+- Добавлен operational runbook: `api/docs/ai_runtime_operations.md` с runtime config, secrets path, smoke, negative smoke и quick diagnosis.
+- `api/.env.example` уточнён: AWS credentials не должны храниться в репозитории и должны приходить через default boto3 credential chain или runtime role.
+- `docs/qa_plan.md` уточнён: manual AI smoke теперь явно начинается с `system/health` readiness probe перед browser flow.
+
+### Verification notes
+
+- Выполнить в локальном backend окружении:
+  - `cd api && .venv/bin/python -m pytest tests/unit/ai/test_provider.py tests/integration/system/test_health.py -q`
+- Real Bedrock invocation по-прежнему требует внешнего AWS access и не может быть подтверждён только изменениями внутри репозитория.
+- Staging/production-like validation остаётся операционной задачей с реальными credentials, model access и outbound connectivity.

@@ -8,6 +8,8 @@
 - [AGENTS.md](./AGENTS.md) — bootstrap entry point and execution policy for AI agents (required reading order, source-of-truth precedence, mandatory rules).
 - [CLAUDE.md](./CLAUDE.md) — Claude-specific agent entry point; references `AGENTS.md` for all execution context.
 - [docs/guides/local-development.md](./docs/guides/local-development.md) — актуальная инструкция по локальному запуску: Docker Desktop, submodules, `.env`, hosts и URL сервисов.
+- [docs/guides/bedrock-runtime-smoke.md](./docs/guides/bedrock-runtime-smoke.md) — how to verify Bedrock model access, ECS task role/secret wiring, and run the manual AI smoke in AWS
+- [docs/guides/bedrock-runtime-smokeRU.md](./docs/guides/bedrock-runtime-smokeRU.md) — тот же Bedrock runtime smoke guide на русском для команды
 ---
 
 # Зачем это всё нужно

@@ -67,6 +67,7 @@ The canonical flow is:
 4. The frontend builds the notebook context automatically according to the deterministic context-builder rules.
 5. The frontend selects the provider path.
 6. By default, the frontend uses the canonical backend path and sends the request to `POST /api/v1/ai/code-blocks/generate`.
+   - When the editor is working on a local IndexedDB working copy whose route id is local-only, the frontend must still send the server-backed notebook identity from sync metadata rather than the local route id.
 7. The backend validates the request, access rights, and prompt policy.
 8. The backend performs prompt-injection screening.
 9. The backend calls the Bedrock integration adapter.
@@ -187,6 +188,7 @@ The product behavior is:
 - the user may optionally add a `scope:` directive inside that same `text` block
 - the frontend derives the prompt and context automatically
 - if the request starts from an existing `code` block, the frontend must first convert that block into a `text` source block for revision
+- if the active editor route points to a local working-copy id such as `local-...`, the frontend must resolve the server-backed notebook id from sync metadata before calling the backend AI endpoint
 
 ### 6.1 Default Behavior
 

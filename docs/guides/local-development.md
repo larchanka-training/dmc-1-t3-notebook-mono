@@ -2,6 +2,11 @@
 
 Этот документ описывает актуальную последовательность локального запуска монорепозитория.
 
+Дополнительные guides:
+
+- [bedrock-runtime-smoke.md](./bedrock-runtime-smoke.md) — AWS Console checklist для Bedrock runtime, ECS role/secret wiring и manual AI smoke
+- [bedrock-runtime-smokeRU.md](./bedrock-runtime-smokeRU.md) — тот же Bedrock runtime smoke guide на русском для командного использования
+
 ## Что нужно заранее
 
 Перед запуском должны быть установлены:
@@ -57,6 +62,26 @@ Backend:
 ```bash
 cp api/.env.example api/.env
 ```
+
+For local Bedrock access, do not place `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+or `AWS_SESSION_TOKEN` into `api/.env`.
+
+The local `api` container reads AWS credentials through the default boto3 chain from
+your host `~/.aws` directory, mounted read-only into the container. Select the profile
+through the shell before starting Docker Compose:
+
+```bash
+export AWS_PROFILE=your-profile
+```
+
+If you use AWS SSO, refresh the session on the host first:
+
+```bash
+aws sso login --profile your-profile
+```
+
+The local `api` container also disables EC2 instance metadata lookup, so missing local
+credentials fail fast instead of waiting on `169.254.169.254`.
 
 Текущие локальные порты:
 
@@ -128,6 +153,13 @@ chmod +x start-services.sh
 - проверяет, что существуют `ui`, `api`, `ui/.env` и `api/.env`
 - проверяет, что существуют `proxy/certs/notebook.com.pem` и `proxy/certs/notebook.com-key.pem`
 - запускает сервисы через `docker compose up -d`
+
+If you change `AWS_PROFILE` or refresh local AWS credentials, restart the `api`
+container so boto3 rebuilds its credential chain:
+
+```bash
+docker compose restart api
+```
 
 ## Какие адреса открывать
 
@@ -227,6 +259,12 @@ failed to connect to the docker API
 - `docker compose logs frontend`
 - `docker compose logs api`
 - `docker compose ps`
+
+Если проблема касается AI / Bedrock, дополнительно проверьте:
+
+- `AWS_PROFILE` exported in the shell before `./start-services.sh`
+- host `~/.aws/config` and `~/.aws/credentials` (or SSO cache) are valid
+- `docker compose logs api` no longer shows credential lookup falling through to `169.254.169.254`
 
 ### Браузер показывает предупреждение по сертификату
 

@@ -160,7 +160,9 @@ The AI backend flow is designed around a real server-side notebook identity. The
 
 If the current notebook exists only locally and has not been synced to the backend yet, the frontend blocks the request before calling the AI endpoint.
 
-So at the moment AI is available only for a notebook that already exists on the server, not for a purely local unsynced draft.
+If the current editor route uses a local working-copy id such as `local-...`, that alone is not a blocker. A synced local working copy may still call AI as long as sync metadata contains the real server-backed notebook id.
+
+So AI is available for a notebook that already exists on the server, including a synced local working copy of that notebook, but not for a purely local unsynced draft.
 
 ## What Still Needs To Happen Before Real Code Generation Works
 
