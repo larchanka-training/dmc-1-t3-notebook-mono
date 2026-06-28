@@ -87,6 +87,7 @@ jobs:
             -backend-config="key=t3/dmc-1-t3-notebook-mono/prod/terraform.tfstate" \
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
+          terraform -chdir=infra/env/prod untaint aws_backup_vault.db 2>/dev/null || true
           terraform -chdir=infra/env/prod apply -auto-approve \
             -var "api_image=${ECR_REGISTRY}/t3-notebook-api:${IMAGE_TAG}" \
             -var "deploy_nonce=${GITHUB_SHA}"
