@@ -77,7 +77,6 @@ Windows, Linux, and AWS/CI — with no machine-specific assumptions.
 | C5 | Infrastructure is **independent of the canary examples** (deleting any canary must not break runs). |
 | C6 | All paths are POSIX-relative; no absolute or OS-specific paths in config. |
 | C7 | No reliance on a system browser; Vitest uses the in-process DOM, not a real browser. |
-| C8 | **MSW handlers must use absolute URLs** matching the API client's actual base URL. The API client resolves its base from `VITE_API_BASE_URL` (e.g. `http://localhost:8000/api/v1` from `.env`). MSW node transport does **not** resolve relative paths against `localhost` — a handler registered at `/api/v1/auth/session` will **never match** a request to `http://localhost:8000/api/v1/auth/session`. Always derive handler URLs from the shared `TEST_API_BASE` export (see §15.4). |
 
 ---
 
@@ -553,42 +552,6 @@ The setup file is **not** the minimal stub; it must (in addition to MSW lifecycl
 - `test/msw/handlers/auth.ts` provides real handlers for `POST /api/v1/auth/request-otp`,
   `POST /api/v1/auth/verify-otp`, `GET /api/v1/auth/session`, plus mutable-state helpers
   `resetAuthMockState()` (called from `setup.ts` `afterEach`) and `setMockSessionAuthenticated()`.
-
-#### 15.4.1 Absolute URL rule (C8) — mandatory for all handler files
-
-The API client reads `VITE_API_BASE_URL` from the env file (e.g. `.env` → `http://localhost:8000/api/v1`).
-MSW node transport matches **exact URLs**; it does **not** prefix relative paths with `localhost`.
-A handler path like `"/api/v1/auth/session"` will silently fail to intercept
-`http://localhost:8000/api/v1/auth/session`, causing `onUnhandledRequest: 'error'` to fire.
-
-**Pattern to follow in every handler file and every per-test `server.use()` call:**
-
-```ts
-// test/msw/handlers/auth.ts  (and any new handler module)
-export const TEST_API_BASE =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
-  "http://localhost:8000/api/v1";
-const API = `${TEST_API_BASE}/auth`;
-```
-
-```ts
-// inside a test file — per-test override
-import { TEST_API_BASE } from "@test/msw/handlers/auth";
-
-server.use(
-  http.get(`${TEST_API_BASE}/auth/session`, () => HttpResponse.json({ authenticated: false }))
-);
-```
-
-**Rules:**
-- Every new handler module under `test/msw/handlers/` **must** export its own `BASE` constant
-  derived from `import.meta.env.VITE_API_BASE_URL` (or re-use `TEST_API_BASE` from `auth.ts`).
-- Per-test `server.use()` calls in test files **must** use the exported constant, never a
-  hard-coded relative path.
-- The fallback `"http://localhost:8000/api/v1"` keeps handlers correct even if the env var is
-  absent (e.g. CI environments that don't load `.env`).
-- When a new feature adds a different base URL (e.g. a separate AI service), export a separate
-  constant from that handler module.
 
 ### 15.5 Render helpers (deltas vs §6.8)
 

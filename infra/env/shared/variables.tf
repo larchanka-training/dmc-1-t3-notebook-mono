@@ -33,3 +33,21 @@ variable "cloud_map_namespace_name" {
   type        = string
   default     = "t3-notebook.internal"
 }
+
+variable "dr_region" {
+  description = "Secondary AWS region used for disaster-recovery replication."
+  type        = string
+  default     = "eu-west-1"
+}
+
+variable "operator_principal_arns" {
+  description = "IAM principal ARNs (e.g. on-call/SSO role ARNs) allowed to assume the DR operator role. Empty disables creation of the role (no account-root trust)."
+  type        = list(string)
+  default     = []
+}
+
+variable "budget_alert_email" {
+  description = "Email address for AWS Budget alert notifications (team monthly and prod monthly budgets)."
+  type        = string
+  default     = "dmitry.bond.real@gmail.com"
+}

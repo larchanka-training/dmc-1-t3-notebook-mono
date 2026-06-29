@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
       - DevOps
     paths:
       - docs/diag/deploy/**
@@ -21,7 +22,7 @@ env:
   ECR_REGISTRY: 867633231218.dkr.ecr.eu-north-1.amazonaws.com
   TF_STATE_BUCKET: dmc-1-t3-notebook-terraform-state
   TF_LOCK_TABLE: dmc-1-t3-notebook-terraform-lock
-  TF_IN_AUTOMATION: "true"
+  TF_IN_AUTOMATION: 'true'
 
 jobs:
   deploy-main:
@@ -53,6 +54,14 @@ jobs:
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
           terraform -chdir=infra/env/shared apply -auto-approve
+
+      - name: Activate cost allocation tags
+        run: |
+          aws ce update-cost-allocation-tags-status \
+            --cost-allocation-tags-status \
+              TagKey=Team,Status=Active \
+              TagKey=Environment,Status=Active \
+              TagKey=Project,Status=Active
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -86,6 +95,7 @@ jobs:
             -backend-config="key=t3/dmc-1-t3-notebook-mono/prod/terraform.tfstate" \
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
+          terraform -chdir=infra/env/prod untaint aws_backup_vault.db 2>/dev/null || true
           terraform -chdir=infra/env/prod apply -auto-approve \
             -var "api_image=${ECR_REGISTRY}/t3-notebook-api:${IMAGE_TAG}" \
             -var "deploy_nonce=${GITHUB_SHA}"
@@ -105,7 +115,12 @@ jobs:
         run: |
           API_BASE_URL=$(terraform -chdir=../infra/env/prod output -raw api_base_url)
           pnpm install --frozen-lockfile
-          VITE_API_BASE_URL="${API_BASE_URL}" pnpm build
+          VITE_API_BASE_URL="${API_BASE_URL}" \
+          VITE_WEBLLM_LOCAL_MODE_ROLLOUT_POLICY=public-opt-in \
+          VITE_WEBLLM_LOCAL_MODE_ENABLED=true \
+          VITE_WEBLLM_MODEL=Llama-3.2-1B-Instruct-q4f32_1-MLC \
+          VITE_WEBLLM_BOOTSTRAP_TIMEOUT_MS=120000 \
+          pnpm build
 
       - name: Deploy UI to S3
         run: |

@@ -41,7 +41,8 @@ MVP должен дать основной сценарий работы с `Jav
 - документация и архитектура опережают реализацию
 - каркас интерфейса и макет редактора уже существуют
 - backend `Email + OTP` auth и session flow уже реализованы и покрыты integration tests
-- `Google OAuth`, backend-хранение notebook, sync, AI и реальный execution runtime ещё не завершены как сквозные продуктовые возможности
+- браузерный execution runtime уже реализован как текущий baseline, включая завершённую follow-up миграцию на live worker session
+- `Google OAuth`, backend-хранение notebook, sync, AI, export и полная release-readiness ещё не завершены как сквозные продуктовые возможности
 - backend-модули для notebook и AI пока всё ещё в основном скелетные
 
 Поэтому этот план начинается не с нуля, а с уже существующей частичной базы.
@@ -208,7 +209,7 @@ MVP должен дать основной сценарий работы с `Jav
 
 **Статус**
 
-`planned`
+`done`
 
 **Цель**
 
@@ -228,6 +229,14 @@ MVP должен дать основной сценарий работы с `Jav
 - правила сброса и повторного использования session
 - outputs: `text`, `object`, `table`, `error`
 - поддержку chart output либо в этом этапе, либо сразу после него
+
+**Текущее примечание**
+
+Базовое runtime-поведение Stage 5 уже реализовано.
+
+Более поздний переход от replay-based восстановления состояния к live worker-owned session тоже завершён и зафиксирован в [04-live-worker-session-transition-plan.md](./04-live-worker-session-transition-plan.md).
+
+Этот исторический артефакт нужно читать как закрытый follow-up slice по runtime, а не как следующий активный этап в текущей MVP-последовательности.
 
 **Что блокирует**
 
@@ -369,14 +378,15 @@ flowchart TD
 
 - [01-auth-backend-plan.md](./01-auth-backend-plan.md)
 - [02-notebook-persistence-plan.md](./02-notebook-persistence-plan.md)
+- [03-execution-runtime.md](./03-execution-runtime.md)
+- [04-live-worker-session-transition-plan.md](./04-live-worker-session-transition-plan.md)
 
-Далее рекомендуется добавить:
+Далее рекомендуется добавить для ещё открытых областей roadmap:
 
 - `docs/plans/03-local-first-persistence-plan.md`
-- `docs/plans/04-execution-runtime-plan.md`
-- `docs/plans/05-sync-plan.md`
-- `docs/plans/06-ai-integration-plan.md`
-- `docs/plans/07-release-readiness-plan.md`
+- `docs/plans/04-sync-plan.md`
+- `docs/plans/05-ai-integration-plan.md`
+- `docs/plans/06-release-readiness-plan.md`
 
 ## Рекомендуемый порядок выполнения
 
@@ -387,7 +397,7 @@ flowchart TD
 3. закрыть оставшийся scope этапа 2 или явно отложить `Google OAuth`
 4. завершить этап 3 по backend-хранению notebook
 5. реализовать этап 4 по local-first хранению
-6. реализовать этап 5 по выполнению кода
+6. считать этап 5 по runtime уже завершённым и не переоткрывать его без новой отдельно утверждённой runtime-задачи
 7. реализовать этап 6 по синхронизации и конфликтам
 8. реализовать этап 7 по AI-помощи
 9. завершить этап 8 по экспорту, качеству и готовности к выпуску

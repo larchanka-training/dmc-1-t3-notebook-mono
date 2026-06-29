@@ -278,11 +278,12 @@ The current architecture is easiest to defend if the team accepts this package:
 
 1. Provider access is `backend-first`.
 2. `WebLLM` is optional local mode and retry path, not the main production path.
-3. Backend returns normalized validated code, not raw provider text.
-4. AI uses an existing `text` block as the prompt source and inserts generated code into a normal `code` block placed after that `text` block.
-5. Backend performs prompt screening, code extraction, syntax validation, and bounded repair retry.
-6. Version 1 does not require a user-facing durable or pseudo-durable AI prompt block; any transient UI state stays implementation-only.
-7. Optional AI provenance metadata is future scope, not baseline.
+3. Explicit local `WebLLM` mode is allowed for unsynced local working copies; this does not change the synced-notebook prerequisite for the backend AI path.
+4. Backend returns normalized validated code, not raw provider text.
+5. AI uses an existing `text` block as the prompt source and inserts generated code into a normal `code` block placed after that `text` block.
+6. Backend performs prompt screening, code extraction, syntax validation, and bounded repair retry.
+7. Version 1 does not require a user-facing durable or pseudo-durable AI prompt block; any transient UI state stays implementation-only.
+8. Optional AI provenance metadata is future scope, not baseline.
 
 ## Why This Direction Was Chosen
 
@@ -294,6 +295,7 @@ This direction is preferred because it:
 - gives frontend a clean contract
 - contains security-sensitive logic on backend
 - supports later local mode without making local mode the main architecture
+- preserves the offline-first product story by allowing explicit local generation on unsynced local working copies
 - satisfies the hardest sprint requirement: extract, validate, and repair invalid code
 
 ## Output Expected From This Design Work
@@ -316,3 +318,13 @@ The design work should produce:
 - Should Version 1 support pasted text only, or also CSV/file import?
 - Should any AI provenance metadata be stored in block `meta` later?
 - Should Version 1 support only implicit context from the source `text` block by default, or also a lightweight `scope:` directive such as `scope: this` and `scope: notebook`?
+
+## Implementation Freeze For WebLLM Scope
+
+The following points are now fixed for implementation planning:
+
+- `WebLLM` remains optional local mode and retry fallback, not the default provider path
+- automatic provider routing based on prompt length or frontend heuristics is out of scope
+- explicit local `WebLLM` mode may run on unsynced local working copies
+- the backend AI path still requires a synced server-backed notebook and is not relaxed by local mode
+- local-mode results must be explicitly labeled as coming from `WebLLM`

@@ -1,6 +1,7 @@
 locals {
   environment = "shared"
   tags = {
+    Team        = "t3"
     Project     = "dmc-1-t3-notebook"
     Repository  = var.repository
     ManagedBy   = "terraform"
@@ -24,6 +25,27 @@ module "ecr" {
 
   repositories = toset(["t3-notebook-ui", "t3-notebook-api"])
   tags         = local.tags
+}
+
+# ECR cross-region replication is an account-level singleton — managing it here
+# (not inside the ecr module) prevents sibling env applies from overwriting it.
+# See runbook §3.2.
+resource "aws_ecr_replication_configuration" "dr" {
+  count = var.dr_region != "" ? 1 : 0
+
+  replication_configuration {
+    rule {
+      destination {
+        region      = var.dr_region
+        registry_id = data.aws_caller_identity.current.account_id
+      }
+
+      repository_filter {
+        filter      = "t3-notebook"
+        filter_type = "PREFIX_MATCH"
+      }
+    }
+  }
 }
 
 module "iam" {
@@ -114,4 +136,61 @@ resource "aws_route53_record" "ses_domain_verification" {
   type    = "TXT"
   ttl     = 300
   records = ["3qmSw9KyJKTeT/vVg50WHgdXIXR8C1jh5dw6HMqMMtE="]
+}
+
+# ---------- Operator / on-call DR role ----------
+# Read-only role granting the IAM actions the DR runbook requires (ECR
+# replication, Route 53 health checks, service quotas). See runbook §5.5.
+#
+# Trust is scoped to explicit on-call/SSO principal ARNs (operator_principal_arns)
+# — never the account root, which would let any IAM principal in the account
+# (developers, CI runners, ECS task roles) assume it. When no principals are
+# supplied the role is not created.
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "operator_assume" {
+  count = length(var.operator_principal_arns) > 0 ? 1 : 0
+
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "AWS"
+      identifiers = var.operator_principal_arns
+    }
+  }
+}
+
+resource "aws_iam_role" "operator" {
+  count              = length(var.operator_principal_arns) > 0 ? 1 : 0
+  name               = "t3-notebook-operator"
+  assume_role_policy = data.aws_iam_policy_document.operator_assume[0].json
+
+  tags = merge(local.tags, {
+    Name = "t3-notebook-operator"
+  })
+}
+
+resource "aws_iam_role_policy" "operator_dr_readonly" {
+  count = length(var.operator_principal_arns) > 0 ? 1 : 0
+  name  = "dr-runbook-readonly"
+  role  = aws_iam_role.operator[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "DRRunbookReadOnly"
+        Effect = "Allow"
+        Action = [
+          "ecr:DescribeRegistry",
+          "route53:ListHealthChecks",
+          "route53:GetHealthCheck",
+          "servicequotas:ListServiceQuotas",
+          "servicequotas:GetServiceQuota",
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }

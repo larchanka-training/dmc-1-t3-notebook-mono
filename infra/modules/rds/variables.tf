@@ -83,6 +83,12 @@ variable "skip_final_snapshot" {
   default     = false
 }
 
+variable "secret_replica_regions" {
+  description = "Regions to replicate the connection secret to for disaster recovery."
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "Common tags applied to RDS resources."
   type        = map(string)

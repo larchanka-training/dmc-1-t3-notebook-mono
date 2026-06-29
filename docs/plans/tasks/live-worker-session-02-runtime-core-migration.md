@@ -10,7 +10,7 @@
 
 ## Контекст
 
-- `docs/plans/06-live-worker-session-transition-plan.md`
+- `docs/plans/04-live-worker-session-transition-plan.md`
 - `docs/plans/tasks/live-worker-session-01-target-semantics-and-contracts.md`
 - `docs/requirements.md`
 - `docs/project.md`
@@ -96,7 +96,7 @@
 - `Conditional:`
 - `ui/docs/runtime_architecture.md`
 - `ui/docs/adr/ADR-003-runtime-execution-model.md`
-- `docs/plans/06-live-worker-session-transition-plan.md`
+- `docs/plans/04-live-worker-session-transition-plan.md`
 
 ## Риски / заметки
 

@@ -32,6 +32,7 @@ It describes:
 | Production compute | `AWS ECS Fargate` | Backend API container runtime |
 | Production database | `AWS RDS PostgreSQL 16` | Managed PostgreSQL in production and dev environments |
 | Static asset storage | `AWS S3` | Private bucket storing built UI assets served by CloudFront |
+| API runtime configuration (production) | `AWS Secrets Manager` | Single ini-format secret injected into the API container at startup via `AWS_APP_SECRET_ARN`; resolved before Pydantic Settings loads the `.env` file |
 | Infrastructure as code | `Terraform` | AWS resource provisioning and state management |
 | CI/CD | `GitHub Actions` | Automated build, test, and deploy pipeline |
 | DB administration | `pgAdmin` | Local database inspection and administration |
@@ -60,6 +61,7 @@ The confirmed frontend stack is:
 - `Dexie 4` (IndexedDB local persistence)
 - `Recharts` (charting)
 - `lucide-react` (icons)
+- `WebLLM` via `@mlc-ai/web-llm` (optional, lazy local AI runtime for explicit browser-local mode; rollout remains disabled by default and intended for `dev-opt-in` enablement)
 - `pnpm` (package manager)
 - `Vitest 4` + `React Testing Library` (unit and component tests)
 - `MSW 2` (API mocking in tests)
@@ -149,10 +151,11 @@ The confirmed AI integration choices are:
 
 - AI requests are initiated from the frontend
 - AI provider access goes through the backend
+- the canonical provider path remains backend-mediated; `WebLLM` is an optional explicit browser-local mode
 - AI returns code for a selected notebook block
 - returned AI code becomes normal editable notebook content after insertion
 
-This means the project does not use direct browser-to-provider LLM access in Version 1.
+This means the project does not use direct browser-to-provider LLM access as the default Version 1 path.
 
 ## 9. Local Development Tooling
 
@@ -181,6 +184,7 @@ The confirmed cloud hosting stack for `dev` and `prod` environments is:
 | API compute | `ECS Fargate` | Stateless container; one service per environment |
 | Database | `RDS PostgreSQL 16` | Private subnet; credentials in Secrets Manager |
 | Infrastructure | `Terraform` | State in S3 with DynamoDB locking |
+| API runtime secrets | `AWS Secrets Manager` | Single ini-format secret resolved by `AWS_APP_SECRET_ARN` at container startup; absent in local dev where `.env` is used |
 | CI/CD | `GitHub Actions` | `deploy-main.yml` builds API image and UI assets, applies Terraform, syncs S3, invalidates CloudFront |
 
 The UI and API share the same CloudFront domain. The browser sends all requests (`/` and `/api/*`) to CloudFront over HTTPS. CloudFront routes `/api/*` to the ALB internally over HTTP. Session cookies set by the API are forwarded through CloudFront.

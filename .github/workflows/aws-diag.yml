@@ -3,6 +3,7 @@ name: AWS Diagnostics
 on:
   push:
     branches:
+      - develop
       - DevOps
     paths:
       - docs/diag/aws/**

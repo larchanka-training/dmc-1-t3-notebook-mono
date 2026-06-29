@@ -65,8 +65,9 @@ The canonical flow is:
 2. The user opens the AI action for that `text` block.
 3. The frontend derives the AI request from the `text` block content, reads any optional `scope:` directive, and creates or restores any transient UI state for that block.
 4. The frontend builds the notebook context automatically according to the deterministic context-builder rules.
-5. The frontend selects the provider path.
+5. The frontend selects the provider path through a shared frontend AI provider boundary that normalizes provider results, warnings, and retryable versus non-retryable errors.
 6. By default, the frontend uses the canonical backend path and sends the request to `POST /api/v1/ai/code-blocks/generate`.
+   - When the editor is working on a local IndexedDB working copy whose route id is local-only, the frontend must still send the server-backed notebook identity from sync metadata rather than the local route id.
 7. The backend validates the request, access rights, and prompt policy.
 8. The backend performs prompt-injection screening.
 9. The backend calls the Bedrock integration adapter.
@@ -187,6 +188,7 @@ The product behavior is:
 - the user may optionally add a `scope:` directive inside that same `text` block
 - the frontend derives the prompt and context automatically
 - if the request starts from an existing `code` block, the frontend must first convert that block into a `text` source block for revision
+- if the active editor route points to a local working-copy id such as `local-...`, the frontend must resolve the server-backed notebook id from sync metadata before calling the backend AI endpoint
 
 ### 6.1 Default Behavior
 
@@ -268,6 +270,12 @@ This keeps requests cheaper, faster, and less likely to confuse the model.
 
 ## 7. AI Service API
 
+The canonical Version 1 backend request/response and error contract is defined in:
+
+- `api/docs/ai_contract.md`
+
+This section is intentionally a high-level architectural summary and must not diverge from that contract document.
+
 ### 7.1 Canonical Route
 
 Canonical AI route:
@@ -276,9 +284,20 @@ Canonical AI route:
 
 This remains the single block-oriented AI endpoint for Version 1.
 
-### 7.2 Request Shape
+### 7.2 Request Summary
 
-Recommended request shape:
+The backend request contains:
+
+- `notebookId`
+- `sourceBlockId`
+- `mode`
+- `prompt`
+- `context`
+- `insertionStrategy`
+
+The full canonical payload shape, field rules, size limits, and enums are fixed in the contract artifact above.
+
+Illustrative request:
 
 ```json
 {
@@ -303,14 +322,12 @@ Recommended request shape:
         "source": "const headers = ['year', 'amount'];"
       }
     ],
-    "insertion": {
-      "strategy": "next-empty-or-new-after-source"
-    }
-  }
+  },
+  "insertionStrategy": "next-empty-or-new-after-source"
 }
 ```
 
-### 7.3 Request Rules
+### 7.3 Request Rules Summary
 
 Request rules:
 
@@ -322,29 +339,34 @@ Request rules:
 - `context.language` must be `javascript` in Version 1
 - notebook ownership and authenticated access are enforced on the backend
 - prompt-injection screening is enforced on the backend before the provider call
+- request size limits are enforced before the provider call
+- `insertionStrategy` must be `next-empty-or-new-after-source` in Version 1
 
-### 7.4 Response Shape
+### 7.4 Success Response Summary
 
-Recommended success response:
+Illustrative success response:
 
 ```json
 {
   "requestId": "air_123",
   "status": "success",
   "code": "function parseTaxes(csvText) {\\n  return [];\\n}",
-  "provider": "bedrock",
-  "model": "anthropic.claude-3-haiku",
-  "warnings": [],
+  "provider": {
+    "name": "bedrock",
+    "model": "deepseek.v3.2"
+  },
   "validation": {
     "extractionApplied": true,
-    "syntaxOk": true
-  }
+    "syntaxOk": true,
+    "repairAttempts": 0
+  },
+  "warnings": []
 }
 ```
 
-### 7.5 Error Response Shape
+### 7.5 Error Response Summary
 
-Recommended error response:
+Illustrative error response:
 
 ```json
 {
@@ -364,8 +386,18 @@ Prompt policy rules:
 
 - the prompt must ask for code generation or code revision
 - non-code requests should be rejected
-- the backend is the final enforcement point for prompt policy
+- for the canonical backend path, the backend is the final enforcement point for prompt policy
 - the frontend may add lightweight user guidance before submission, but frontend checks are not the trust boundary
+- explicit local `WebLLM` mode is an exception to the normal backend trust boundary and therefore has weaker policy guarantees than the canonical backend path
+
+### 8.0.1 Prompt Policy Trust Boundaries
+
+Prompt-policy trust boundaries differ by provider path:
+
+- for `frontend -> backend -> Bedrock`, the backend remains the final enforcement point
+- for explicit local `WebLLM` mode, the product may apply frontend-local guidance or lightweight checks, but these are not equivalent to backend enforcement
+- local mode must therefore remain explicit, optional, and clearly labeled in the UI
+- local mode must not be presented as having the same policy guarantees, observability, or audit semantics as the canonical backend path
 
 ## 8.1 Prompt-Injection Screening
 
@@ -490,12 +522,33 @@ Provider selection rules:
 
 - the canonical default is `backend-first`
 - the frontend must try the backend path first unless explicit local mode is configured
-- local mode activation should be explicit, either by feature flag, user setting, or explicit retry action
-- local generation may be enabled in `development` and `demo` environments as an explicit override
+- local mode activation must remain explicit through frontend runtime configuration and explicit user action
+- the current rollout policy is `disabled by default` with `dev-opt-in` as the intended delivery mode for local engineering and QA validation
+- a broader `public-opt-in` rollout must be treated as an explicit product decision and configuration change rather than an ambient browser capability
 - local retry may be offered when the backend fails with retryable timeout, network, or availability errors
-- local generation uses the same high-level prompt intent but may use reduced context
+- local generation uses the same high-level prompt intent and the same normalized frontend request shape, but may consume a reduced subset of that context internally
 - local responses must still be treated as untrusted proposed code
 - the UI should not silently switch providers without a user-visible signal
+- automatic provider routing based on prompt length, notebook size, or frontend heuristics is out of scope for Version 1
+
+Current frontend rollout controls:
+
+- `VITE_WEBLLM_LOCAL_MODE_ROLLOUT_POLICY=disabled|dev-opt-in|public-opt-in`
+- `VITE_WEBLLM_LOCAL_MODE_ENABLED=true|false`
+- effective local mode availability requires both:
+  - a rollout policy that allows the current environment
+  - an explicit enable flag
+- the UI may keep a visible notebook-level local-mode status or preparation surface even when local mode is not currently available, but that surface must stay clearly explained through explicit readiness or policy messaging
+- when the rollout policy is `dev-opt-in`, local mode is intended for local development and QA-only validation rather than public production exposure
+
+### 10.2.1 Notebook Identity Rules
+
+Notebook identity rules must remain explicit and provider-specific:
+
+- the canonical backend path still requires a synced server-backed notebook identity
+- explicit local `WebLLM` mode may run on an unsynced local working copy because it does not require backend notebook lookup
+- this does not relax backend auth, notebook access, or sync prerequisites for `POST /api/v1/ai/code-blocks/generate`
+- the UI must distinguish `backend unavailable because notebook is unsynced` from `local mode unavailable because runtime or feature policy does not allow it`
 
 ### 10.3 Why WebLLM Is Not the Primary Path
 
@@ -515,15 +568,49 @@ Recommended local retry UX:
 3. The user sees an option such as `Retry locally with WebLLM`.
 4. The frontend runs the fallback generation path.
 5. The result is labeled with `provider = webllm`.
+6. Backend and local attempts remain visually distinct in status, error, and result messaging.
 
 ### 10.5 Explicit Local Mode
 
 Recommended explicit local mode behavior:
 
-- a user or environment flag such as `useLocalAI: true` may opt into local generation
+- an environment flag pair such as `VITE_WEBLLM_LOCAL_MODE_ROLLOUT_POLICY=dev-opt-in` and `VITE_WEBLLM_LOCAL_MODE_ENABLED=true` may opt into local generation
 - explicit local mode is suitable for `development`, `demo`, or intentionally offline workflows
+- explicit local mode may be used on unsynced local working copies
+- notebook-level local runtime preparation may stay visible before readiness, but block-level `Generate locally` should appear only when the local runtime is already `ready`
+- when a local runtime preparation surface is shown, it should be notebook-scoped rather than repeated for every eligible source block
 - even in explicit local mode, the UI should clearly label that the result came from `WebLLM`
 - explicit local mode is a product decision and must be documented consistently in frontend settings, QA coverage, and operator documentation
+- explicit local mode does not change notebook insertion semantics, block types, or the canonical backend path
+
+Recommended UI split for explicit local mode:
+
+- notebook-level local runtime status and preparation belong to the editor `top bar` or another notebook-scoped operational surface
+- source-block actions remain block-scoped and may include backend `Generate code`, local `Generate locally` when ready, and local retry after retryable backend failure
+- local mode must not be presented as a second default provider path equal to the canonical backend action
+
+Browser and runtime caveats for implementation and QA:
+
+- secure browser context is required
+- `Web Worker`, `WebAssembly`, and `WebGPU` support are required
+- model bootstrap remains lazy and should not start during normal page load when local mode is disabled
+- runtime support is browser- and device-dependent even when the feature flag is enabled
+- model download size and startup latency remain environment-specific and should be treated as rollout risk, not as guaranteed baseline behavior
+- if local mode is disabled by policy, QA should expect the baseline backend-first AI path to remain primary, while any visible local-mode controls stay disabled and clearly explained rather than silently active
+
+### 10.6 Local Provider Normalization Boundary
+
+The local `WebLLM` provider may apply a lightweight frontend-local normalization step before notebook insertion so that local results stay compatible with the canonical insertion semantics.
+
+Allowed local normalization:
+
+- extract code from fenced markdown responses when the local model includes markdown wrappers
+- trim obvious leading or trailing prose noise when a usable code candidate is still present
+- perform deterministic frontend-side JavaScript syntax validation before returning `success`
+
+The local provider must still fail with a normalized local-provider error when no usable JavaScript code can be extracted or when the resulting code is syntactically invalid.
+
+This local normalization does not replace the backend validation pipeline and does not create a separate notebook insertion rule set.
 
 ## 11. Code Extraction and Validation
 
@@ -592,12 +679,13 @@ The AI pipeline must handle at least the following error classes:
 - invalid request payload
 - unauthorized notebook access
 - non-code prompt rejection
+- unsafe prompt rejection
 - provider timeout
 - provider unavailable
 - malformed provider response
 - code extraction failure
 - syntax validation failure
-- local fallback unavailable
+- frontend-local fallback unavailable
 
 ### 12.2 Recommended Error Codes
 
@@ -612,7 +700,8 @@ Recommended normalized backend error codes:
 - `AI_RESPONSE_INVALID`
 - `AI_CODE_EXTRACTION_FAILED`
 - `AI_CODE_SYNTAX_INVALID`
-- `AI_FALLBACK_UNAVAILABLE`
+
+`AI_FALLBACK_UNAVAILABLE` remains a frontend-local fallback concern and is not part of the backend contract for `POST /api/v1/ai/code-blocks/generate`.
 
 ### 12.3 Frontend Error Behavior
 

@@ -28,7 +28,7 @@ A web-based **JavaScript notebook** platform — write notes, author/run JS code
 - **AI**: Backend-mediated LLM access via a single block-oriented endpoint
 - **Notebook format**: JSON (canonical), Markdown (text blocks), JavaScript (code blocks)
 - **Local dev**: Docker Compose + Nginx + self-signed TLS, local domains (`notebook.com`, `api.notebook.com`)
-- **Cloud (dev/prod)**: S3 + CloudFront (UI static assets, HTTPS, `/api/*` proxy), ALB, ECS Fargate (API), RDS PostgreSQL 16, Terraform
+- **Cloud (dev/prod)**: S3 + CloudFront (UI static assets, HTTPS, `/api/*` proxy), ALB, ECS Fargate (API), RDS PostgreSQL 16, Secrets Manager (API config), Terraform
 
 ## Architecture Rules
 
