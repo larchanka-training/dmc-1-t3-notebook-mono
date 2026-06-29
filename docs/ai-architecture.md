@@ -538,7 +538,7 @@ Current frontend rollout controls:
 - effective local mode availability requires both:
   - a rollout policy that allows the current environment
   - an explicit enable flag
-- the UI may keep a visible local-mode panel and `Generate locally` control even when local mode is not currently available, but such controls must stay clearly disabled and accompanied by an explicit readiness or policy message
+- the UI may keep a visible notebook-level local-mode status or preparation surface even when local mode is not currently available, but that surface must stay clearly explained through explicit readiness or policy messaging
 - when the rollout policy is `dev-opt-in`, local mode is intended for local development and QA-only validation rather than public production exposure
 
 ### 10.2.1 Notebook Identity Rules
@@ -577,10 +577,17 @@ Recommended explicit local mode behavior:
 - an environment flag pair such as `VITE_WEBLLM_LOCAL_MODE_ROLLOUT_POLICY=dev-opt-in` and `VITE_WEBLLM_LOCAL_MODE_ENABLED=true` may opt into local generation
 - explicit local mode is suitable for `development`, `demo`, or intentionally offline workflows
 - explicit local mode may be used on unsynced local working copies
-- the UI may keep `Generate locally` visible while disabled and require an explicit runtime-preparation step before the control becomes actionable
+- notebook-level local runtime preparation may stay visible before readiness, but block-level `Generate locally` should appear only when the local runtime is already `ready`
+- when a local runtime preparation surface is shown, it should be notebook-scoped rather than repeated for every eligible source block
 - even in explicit local mode, the UI should clearly label that the result came from `WebLLM`
 - explicit local mode is a product decision and must be documented consistently in frontend settings, QA coverage, and operator documentation
 - explicit local mode does not change notebook insertion semantics, block types, or the canonical backend path
+
+Recommended UI split for explicit local mode:
+
+- notebook-level local runtime status and preparation belong to the editor `top bar` or another notebook-scoped operational surface
+- source-block actions remain block-scoped and may include backend `Generate code`, local `Generate locally` when ready, and local retry after retryable backend failure
+- local mode must not be presented as a second default provider path equal to the canonical backend action
 
 Browser and runtime caveats for implementation and QA:
 
