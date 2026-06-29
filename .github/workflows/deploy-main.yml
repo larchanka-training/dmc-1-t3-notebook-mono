@@ -55,6 +55,14 @@ jobs:
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
           terraform -chdir=infra/env/shared apply -auto-approve
 
+      - name: Activate cost allocation tags
+        run: |
+          aws ce update-cost-allocation-tags-status \
+            --cost-allocation-tags-status \
+              TagKey=Team,Status=Active \
+              TagKey=Environment,Status=Active \
+              TagKey=Project,Status=Active
+
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
