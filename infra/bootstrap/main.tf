@@ -1,5 +1,6 @@
 locals {
   tags = {
+    Team        = "t3"
     Project     = "dmc-1-t3-notebook"
     Repository  = var.repository
     ManagedBy   = "terraform"
