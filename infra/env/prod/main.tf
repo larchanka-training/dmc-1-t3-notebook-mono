@@ -15,6 +15,7 @@ locals {
   root_domain         = var.root_domain
   api_domain          = "api.${var.root_domain}"
   tags = {
+    Team        = "t3"
     Project     = "dmc-1-t3-notebook"
     Repository  = var.repository
     ManagedBy   = "terraform"

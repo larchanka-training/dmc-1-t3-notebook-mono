@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
       - DevOps
     paths:
       - docs/diag/deploy/**
@@ -54,6 +55,14 @@ jobs:
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
           terraform -chdir=infra/env/shared apply -auto-approve
 
+      - name: Activate cost allocation tags
+        run: |
+          aws ce update-cost-allocation-tags-status \
+            --cost-allocation-tags-status \
+              TagKey=Team,Status=Active \
+              TagKey=Environment,Status=Active \
+              TagKey=Project,Status=Active
+
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -86,6 +95,7 @@ jobs:
             -backend-config="key=t3/dmc-1-t3-notebook-mono/prod/terraform.tfstate" \
             -backend-config="region=${AWS_REGION}" \
             -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
+          terraform -chdir=infra/env/prod untaint aws_backup_vault.db 2>/dev/null || true
           terraform -chdir=infra/env/prod apply -auto-approve \
             -var "api_image=${ECR_REGISTRY}/t3-notebook-api:${IMAGE_TAG}" \
             -var "deploy_nonce=${GITHUB_SHA}"

@@ -45,3 +45,9 @@ variable "operator_principal_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "budget_alert_email" {
+  description = "Email address for AWS Budget alert notifications (team monthly and prod monthly budgets)."
+  type        = string
+  default     = "dmitry.bond.real@gmail.com"
+}

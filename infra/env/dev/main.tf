@@ -11,6 +11,7 @@ data "terraform_remote_state" "shared" {
 locals {
   runtime_environment = "staging"
   tags = {
+    Team        = "t3"
     Project     = "dmc-1-t3-notebook"
     Repository  = var.repository
     ManagedBy   = "terraform"
